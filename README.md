@@ -32,6 +32,11 @@
 Y=X\times W
 \]
 
+
+$$
+Y=X\times W
+$$
+
 - X: 입력 데이터
 - W: 가중치(Weight)
 - Y: 연산 결과
