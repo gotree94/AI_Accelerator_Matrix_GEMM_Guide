@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>블록 행렬 곱셈 시뮬레이터</title>
+<style>
+  :root {
+    --bg: #F7F6F1; --panel: #FFFFFF; --ink: #1D2433; --ink-soft: #4A5568; --muted: #A0A8B5;
+    --navy: #14213D; --line: #E1DED4;
+    --orange: #E07A2F; --orange-ink: #B4501A; --orange-tint: #F9E1CE; --orange-deep: #F2B98E;
+    --blue: #2F6FB0; --blue-tint: #DCE8F6; --blue-deep: #A9C7EA;
+    --green: #2E7D4F; --green-tint: #DDF0E3;
+    --mono: "JetBrains Mono", "D2Coding", Consolas, "Courier New", monospace;
+    --serif: "Cambria Math", "STIX Two Math", "Times New Roman", serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; font-size: 15px; }
+  header { background: var(--navy); color: #F2EFE6; padding: 14px 24px; display: flex; flex-direction: column; gap: 10px; }
+  .titlebar { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 20px; }
+  header h1 { font-size: 20px; margin: 0; font-weight: 700; }
+  header .sub { font-size: 13px; color: #BFC8D6; font-family: var(--mono); }
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+  .controls .grp { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-right: 12px; border-right: 1px solid #33456A; }
+  .controls .grp:last-child { border-right: none; }
+  .controls button, .controls select { font: inherit; font-size: 14px; border: 1px solid #3A4A6B; background: #22304F; color: #F2EFE6; border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+  .controls button:hover { background: #2C3D62; }
+  .controls button.primary { background: var(--orange); border-color: var(--orange); color: #1D2433; font-weight: 700; }
+  .controls button:disabled { opacity: .4; cursor: default; }
+  .controls label { font-size: 13px; color: #BFC8D6; display: flex; align-items: center; gap: 6px; }
+  .controls input[type=range] { width: 90px; }
+  .progress { font-family: var(--mono); font-size: 13px; color: #F0A35E; min-width: 110px; }
+  .seg { display: inline-flex; border: 1px solid #3A4A6B; border-radius: 8px; overflow: hidden; }
+  .seg button { border: none; border-radius: 0; padding: 6px 12px; }
+  .seg button.on { background: #F0A35E; color: #1D2433; font-weight: 700; }
+
+  main { display: grid; grid-template-columns: minmax(440px, 1.15fr) minmax(360px, 1fr); gap: 16px; padding: 16px 24px 8px; }
+  @media (max-width: 1100px) { main { grid-template-columns: 1fr; padding: 12px 16px; } header { padding: 12px 16px; } }
+  .col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px 16px; min-width: 0; }
+  .panel h2 { font-size: 15px; margin: 0 0 10px; color: var(--navy); display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .panel h2 .tag { font-size: 11px; font-weight: 500; letter-spacing: 1px; color: var(--orange-ink); }
+  .panel h3 { font-size: 13px; margin: 16px 0 8px; color: var(--ink-soft); font-weight: 600; }
+  .stack { display: flex; flex-direction: column; gap: 12px; }
+  .scroll { overflow-x: auto; padding-bottom: 4px; }
+  .hint { font-size: 12.5px; color: var(--ink-soft); line-height: 1.55; margin: 8px 0 0; }
+
+  .falk { display: grid; grid-template-columns: max-content max-content; grid-template-rows: max-content max-content; gap: 14px 18px; align-items: end; justify-content: start; }
+  .falk .cell-tl { font-size: 13px; color: var(--ink-soft); text-align: right; line-height: 1.6; }
+  .falk.vta { align-items: start; }
+  .falk.vta .cell-tl { text-align: left; align-self: end; }
+  .mwrap { display: flex; flex-direction: column; gap: 4px; }
+  .mname { font-family: var(--serif); font-style: italic; font-size: 20px; color: var(--navy); }
+  .mname small { font-style: normal; font-family: inherit; font-size: 12px; color: var(--ink-soft); margin-left: 6px; }
+  .mat { display: inline-grid; border-left: 2px solid var(--navy); border-right: 2px solid var(--navy); border-radius: 6px; padding: 3px 4px; }
+  .c { width: 30px; height: 26px; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 12.5px; color: var(--ink); border-right: 1px solid transparent; border-bottom: 1px solid transparent; transition: background .2s; }
+  .c.br { border-right: 2px dashed #8C96A8; }
+  .c.bb { border-bottom: 2px dashed #8C96A8; }
+  .c.hA { background: var(--orange-tint); font-weight: 700; }
+  .c.hB { background: var(--blue-tint); font-weight: 700; }
+  .c.hRow { background: #FBF0E6; }
+  .c.hCol { background: #EEF4FB; }
+  .c.hC { background: var(--green-tint); font-weight: 700; outline: 2px solid var(--green); outline-offset: -2px; }
+  .c.acc { background: #F0F8F2; color: var(--green); }
+  .c.done { background: var(--green-tint); color: var(--green); font-weight: 600; }
+  .c.pend { color: var(--muted); }
+
+  .blist { display: flex; flex-direction: column; gap: 4px; font-family: var(--serif); font-size: 17px; line-height: 1.7; }
+  .bl { padding: 2px 10px; border-radius: 6px; }
+  .bl.now { background: #FFF3E0; }
+  .bl.fin { background: var(--green-tint); }
+  .t-done { color: var(--ink); }
+  .t-cur { color: #fff; background: var(--orange); border-radius: 6px; padding: 0 5px; }
+  .t-future { color: var(--muted); }
+  .vname { font-family: var(--mono); font-style: normal; font-size: .85em; }
+
+  /* 메모리 띠 */
+  .strip { display: inline-grid; gap: 2px; }
+  .mc { width: 26px; height: 22px; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 11px; border-radius: 3px; background: #F3F2EC; color: var(--ink-soft); }
+  .mc.alt { background: #E7E5DD; }
+  .mc.curW { background: var(--blue-deep); color: var(--ink); font-weight: 700; }
+  .mc.curX { background: var(--orange-deep); color: var(--ink); font-weight: 700; }
+  .mc.cut { box-shadow: inset 2px 0 0 #8C96A8; }
+  .addr { font-family: var(--mono); font-size: 12px; color: var(--ink-soft); margin-top: 6px; line-height: 1.6; }
+  .addr b { color: var(--ink); }
+  .addr .good { color: var(--green); font-weight: 700; }
+  .addr .bad { color: #B42318; font-weight: 700; }
+  .entmap { display: inline-grid; gap: 3px; margin-top: 4px; }
+  .em { width: 34px; height: 26px; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 11.5px; background: #F1F0EA; color: var(--ink-soft); }
+  .em.cur { background: var(--blue-deep); color: var(--ink); font-weight: 700; }
+  .em.curX { background: var(--orange-deep); color: var(--ink); font-weight: 700; }
+  .maprow { display: flex; flex-wrap: wrap; gap: 24px; }
+
+  .formula { font-family: var(--serif); font-size: 20px; line-height: 1.7; padding: 10px 14px; background: #FBFAF6; border: 1px solid var(--line); border-radius: 10px; }
+  .calc { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .op { font-size: 22px; color: var(--ink-soft); font-family: var(--serif); }
+  .mini { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+  .mini .mname { font-size: 17px; }
+  .mini .mat .c { width: 34px; }
+  .tA .c { background: var(--orange-tint); }
+  .tB .c { background: var(--blue-tint); }
+  .tP .c { background: #FFF3E0; }
+  .tC .c { background: var(--green-tint); }
+  .terms { font-family: var(--mono); font-size: 13px; line-height: 1.75; background: #1D2433; color: #E8E4D8; padding: 10px 12px; border-radius: 10px; overflow-x: auto; white-space: nowrap; }
+  .terms .hl { color: #F0A35E; }
+  .terms .mut { color: #8FA3BF; }
+  .explain { font-size: 15px; line-height: 1.6; background: #FFF8F1; border-left: 4px solid var(--orange); padding: 10px 14px; border-radius: 6px; min-height: 64px; }
+  .explain b { color: var(--orange-ink); }
+  .note { font-size: 13.5px; line-height: 1.6; color: var(--ink-soft); background: #F3F2EC; padding: 10px 12px; border-radius: 8px; }
+  .note.vta { background: #EAF1FA; color: #23466E; }
+  .note a { color: var(--blue); }
+  .result { font-family: var(--mono); font-size: 13px; line-height: 1.7; }
+  .ok { color: var(--green); font-weight: 700; }
+
+  .cmp { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .cmp th, .cmp td { padding: 6px 7px; border-bottom: 1px solid var(--line); text-align: right; font-family: var(--mono); white-space: nowrap; }
+  .cmp th { font-family: inherit; font-size: 12px; color: var(--ink-soft); font-weight: 600; }
+  .cmp td:first-child, .cmp th:first-child, .cmp td:nth-child(2), .cmp th:nth-child(2) { text-align: left; }
+  .cmp tr[data-i] { cursor: pointer; }
+  .cmp tr.me td { background: #FFF3E0; font-weight: 700; }
+  .cmp tr.stage td { font-family: inherit; font-size: 12px; color: var(--orange-ink); font-weight: 600; background: #FBFAF6; text-align: left; padding-top: 8px; }
+  .cmp td.prod { color: var(--green); font-weight: 700; }
+
+  footer { padding: 0 24px 24px; }
+  @media (max-width: 1100px) { footer { padding: 0 16px 16px; } }
+  .stream { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 16px; }
+  .stream h2 { font-size: 15px; margin: 0 0 8px; color: var(--navy); }
+  .steps { max-height: 160px; overflow-y: auto; font-family: var(--serif); font-size: 16px; line-height: 1.8; }
+  .st { padding: 0 8px; border-radius: 4px; cursor: pointer; color: var(--muted); white-space: nowrap; }
+  .st.past { color: var(--ink); }
+  .st.now { background: var(--orange-tint); color: var(--orange-ink); font-weight: 700; }
+  .st .num { font-family: var(--mono); font-size: 12px; display: inline-block; width: 36px; color: inherit; }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--ink-soft); margin-top: 10px; }
+  .legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -2px; background: var(--c); }
+</style>
+</head>
+<body>
+<header>
+  <div class="titlebar">
+    <h1>블록 행렬 곱셈 시뮬레이터</h1>
+    <div class="sub" id="subtitle"></div>
+  </div>
+  <div class="controls">
+    <div class="grp">
+      <label>예제
+        <select id="preset">
+          <optgroup label="같은 일을 어떻게 묶나 (행 1개)">
+            <option value="0">① 블록 1×1 · (1,16,1,1)×(16,8,1,1)</option>
+            <option value="1">② 블록 1×2 · (1,8,1,2)×(8,8,2,1)</option>
+            <option value="2">③ 블록 1×4 · (1,4,1,4)×(4,8,4,1)</option>
+            <option value="3">④ 블록 1×4, 4×2 · (1,4,1,4)×(4,4,4,2)</option>
+            <option value="4">⑤ 블록 1×4, 4×4 · (1,4,1,4)×(4,2,4,4)</option>
+          </optgroup>
+          <optgroup label="행(배치)이 늘어남 (BATCH = 1)">
+            <option value="5">⑥ 행 2개 · (2,4,1,4)×(4,2,4,4)</option>
+            <option value="6">⑦ 행 4개 · (4,4,1,4)×(4,2,4,4)</option>
+          </optgroup>
+          <optgroup label="하드웨어가 행을 묶음 (BATCH = 2, 4)">
+            <option value="7">⑧ 행 4개, 2행씩 · (2,4,2,4)×(4,2,4,4)</option>
+            <option value="8">⑨ 행 4개, 4행씩 · (1,4,4,4)×(4,2,4,4)</option>
+          </optgroup>
+        </select>
+      </label>
+      <span class="seg" title="같은 계산을 수학 표기 또는 VTA 배치로 보기 (V 키)">
+        <button id="vMath" class="on">수학 보기</button><button id="vVta">VTA 보기</button>
+      </span>
+    </div>
+    <div class="grp">
+      <button id="first" title="처음 (Home)">⏮</button>
+      <button id="prev" title="이전 (←)">◀ 이전</button>
+      <button id="next" class="primary" title="다음 (→)">다음 ▶</button>
+      <button id="play" title="재생/정지 (Space)">▶ 재생</button>
+      <button id="end" title="끝으로 (End)">⏭</button>
+      <label>속도 <input id="speed" type="range" min="50" max="2500" step="50" value="1000"></label>
+      <span class="progress" id="progress"></span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="col">
+    <section class="panel">
+      <h2 id="matTitle">행렬과 블록 분할</h2>
+      <div class="scroll"><div class="falk" id="falk"></div></div>
+      <div class="legend">
+        <span style="--c: var(--orange-tint)">지금 쓰는 x의 단위</span>
+        <span style="--c: var(--blue-tint)">지금 쓰는 W의 단위</span>
+        <span style="--c: var(--green-tint)">만들고 있는 y의 단위</span>
+        <span style="--c: #fff; border: 1px dashed #8C96A8">점선 = 단위 경계</span>
+      </div>
+      <h3>블록 단위로 쓴 곱 · 출력 단위마다 한 줄</h3>
+      <div class="scroll"><div class="blist" id="blockList"></div></div>
+    </section>
+    <section class="panel">
+      <h2>메모리 띠 <span class="tag" id="memTag"></span></h2>
+      <div id="mem"></div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <h2>지금 계산하는 항 <span class="tag">블록 곱 하나</span></h2>
+    <div class="stack">
+      <div class="formula" id="formula"></div>
+      <div class="calc" id="calc"></div>
+      <div class="terms" id="terms"></div>
+      <div class="calc" id="accum"></div>
+      <div class="explain" id="explain"></div>
+      <div class="note" id="note"></div>
+      <div class="result" id="result"></div>
+      <div>
+        <h3 style="margin-top:4px">예제 비교 · 줄을 누르면 그 예제로</h3>
+        <div class="scroll"><table class="cmp" id="cmp"></table></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="stream">
+    <h2>계산 순서 <span style="font-size:12px;font-weight:400;color:var(--ink-soft)">· 줄을 누르면 그 스텝으로 이동</span></h2>
+    <div class="steps" id="steps"></div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  var K = 16, M = 8;
+  var XALL = [
+    [2, 1, 0, -2, -1, -3, -3, -3, -2, 2, 1, 3, 0, 1, 3, 2],
+    [3, 1, 1, 3, 1, 2, 2, -2, -3, -1, -2, 3, 3, -3, 0, 2],
+    [-3, 2, -3, 0, 2, -1, -1, -2, 2, -2, 3, 0, 0, 0, 1, 0],
+    [0, 3, 2, 2, 1, 1, -1, 3, 0, -2, 2, -2, 3, 1, -3, -3]
+  ];
+  var W = [
+    [1, 0, 0, 3, -2, 2, 1, -3], [-1, 3, 0, -3, 2, 2, 2, -2], [-3, 3, -3, 0, -3, -1, 0, -1], [-1, -3, -3, -3, -3, 1, 0, 1],
+    [-2, 1, 2, -1, 0, 3, 2, 3], [-1, 1, 3, 1, 2, 1, 1, -1], [3, -3, 1, 2, 2, 0, -1, -1], [-1, 0, 2, 3, -3, 3, 0, -1],
+    [1, 1, -2, -1, 2, 1, 0, -1], [2, -1, -1, 3, -2, -2, 1, 1], [-3, -3, -1, 2, -1, 2, -1, -2], [2, 3, -3, -3, 1, -1, 1, -2],
+    [3, 0, 3, 2, 1, -2, 2, -3], [0, -1, 3, -2, 3, -3, 1, 1], [3, -1, 3, 1, 3, -2, 2, 3], [-3, -1, 1, -3, 0, 1, 2, 3]
+  ];
+
+  var PRESETS = [
+    { R: 1, BB: 1, BI: 1, BO: 1, label: "①", stage: 0,
+      note: "블록 1×1: 블록 곱이 곧 원소 하나의 곱셈이다. 학교에서 배운 행렬곱 정의 그대로, y의 원소 하나를 x의 행과 W의 열에서 곱 16개를 더해 만든다." },
+    { R: 1, BB: 1, BI: 2, BO: 1, label: "②", stage: 0,
+      note: "입력 쪽으로 2개씩 묶었다. x의 단위는 1×2, W의 단위는 2×1이고, 블록 곱 하나가 길이 2짜리 내적이다. 출력은 아직 하나씩 만든다." },
+    { R: 1, BB: 1, BI: 4, BO: 1, label: "③", stage: 0,
+      note: "입력 쪽으로 4개씩 묶었다. 블록 곱 하나가 길이 4짜리 내적이 되고, 같은 y 원소를 만드는 데 더하는 횟수가 4번으로 줄었다." },
+    { R: 1, BB: 1, BI: 4, BO: 2, label: "④", stage: 0,
+      note: "출력 쪽도 2개씩 묶었다. W의 단위가 4×2가 되어, 블록 곱 하나가 내적 2개(y 원소 2개)를 동시에 만든다. VTA 시뮬레이터 축소판과 같은 블록이다." },
+    { R: 1, BB: 1, BI: 4, BO: 4, label: "⑤", stage: 0,
+      note: "출력 쪽을 4개씩 묶어 W의 단위가 4×4 정사각형이 됐다. 블록 곱 하나가 y 원소 4개를 동시에 만든다. 입력 쪽과 출력 쪽 단위 크기가 같은 이 모양이 실제 VTA 기본 설정(16×16)을 줄여 놓은 것이다." },
+    { R: 2, BB: 1, BI: 4, BO: 4, label: "⑥", stage: 1,
+      note: "x에 행(샘플, 토큰)이 2개다. 하드웨어는 여전히 한 번에 한 행씩(BATCH = 1) 처리하므로 행 하나가 행 단위 하나가 되고, 블록 곱도 ⑤의 2배인 16번이 된다. 같은 W 단위를 두 행이 <b>서로 다른 스텝에서</b> 다시 쓴다." },
+    { R: 4, BB: 1, BI: 4, BO: 4, label: "⑦", stage: 1,
+      note: "행이 4개. 블록 곱 32번, 전체 곱셈 512번이다. W 단위 하나를 4번 다시 쓴다. 버퍼가 작으면 바로 이 재사용 때문에 스케줄링(x 고정 vs W 고정)이 중요해진다. 트랜스포머의 토큰, CNN을 im2col로 편 출력 픽셀이 이 \"행\"이다." },
+    { R: 4, BB: 2, BI: 4, BO: 4, label: "⑧", stage: 2,
+      note: "같은 4행을 하드웨어가 2행씩 한 번에 묶는다(BATCH = 2). x의 단위가 2×4가 되고, 블록 곱 하나에서 W 단위 하나를 두 행이 <b>동시에</b> 쓴다. 블록 곱은 ⑦의 절반인 16번이지만, 블록 곱당 곱셈(= 동시에 일하는 곱셈기 수)은 32로 2배다." },
+    { R: 4, BB: 4, BI: 4, BO: 4, label: "⑨", stage: 2,
+      note: "4행을 한 단위로 묶었다(BATCH = 4). 블록 곱이 처음으로 행렬 × 행렬(4×4 · 4×4)이 되고, 블록 곱 한 번에 W 단위를 한 번 꺼내 네 행이 동시에 쓴다(⑦은 같은 W 단위를 4번의 스텝에서 매번 다시 꺼냈다). 블록 곱은 8번으로 <b>행이 1개였던 ⑤와 같다</b>. 곱셈기만 충분하면 행이 늘어도 시간은 늘지 않는다. 대신 곱셈기가 ⑤의 4배인 64개 필요하다. GPU 텐서 코어나 시스톨릭 어레이가 이런 행렬 × 행렬 블록으로 계산하고, VTA 기본 설정은 곱셈기를 아끼려고 ⑤처럼 벡터 × 행렬(BATCH = 1)을 고른 것이다." }
+  ];
+  var STAGES = ["같은 일을 어떻게 묶나 · 행 1개, 전체 곱셈 128 고정", "행(배치)이 늘어남 · BATCH = 1, W를 시간에 걸쳐 재사용", "하드웨어가 행을 묶음 · ⑦⑧⑨는 같은 512번, 블록 곱 × 곱셈기 = 일정"];
+  var VTA_NOTE = "<b>VTA 보기</b>: 계산은 똑같고 보는 방향과 메모리 배치만 다르다. VTA는 W를 출력 기준으로 돌린 Wᵀ를 단위로 자른다. (Wᵀ)<sub>jk</sub> = (W<sub>kj</sub>)ᵀ 이므로 격자도, 단위 안도 함께 돌아간다. 그리고 단위 하나(= 버퍼 엔트리 하나)를 메모리에 연속으로 둔다. 아래 메모리 띠에서 지금 단위의 칸이 한 덩어리로 붙어 있는지 보자.";
+
+  function el(tag, cls, html) { var d = document.createElement(tag); if (cls) d.className = cls; if (html != null) d.innerHTML = html; return d; }
+  function sg(n) { return n < 0 ? "(" + n + ")" : String(n); }
+  function sub2(a, b) { return "<sub>" + (a > 9 || b > 9 ? a + "," + b : "" + a + b) + "</sub>"; }
+  function mul(A, B) { return A.map(function (row) { return B[0].map(function (_, c) { return row.reduce(function (s, v, t) { return s + v * B[t][c]; }, 0); }); }); }
+  function add(A, B) { return A.map(function (r, i) { return r.map(function (v, j) { return v + B[i][j]; }); }); }
+  function zeros(r, c) { var z = []; for (var i = 0; i < r; i++) { z.push([]); for (var j = 0; j < c; j++) z[i].push(0); } return z; }
+  function slice(Mx, r0, r1, c0, c1) { var o = []; for (var r = r0; r < r1; r++) o.push(Mx[r].slice(c0, c1)); return o; }
+  function T(Mx) { return Mx[0].map(function (_, c) { return Mx.map(function (r) { return r[c]; }); }); }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var P, X, WT, NB, NK, NJ, events, idx = 0, timer = null, view = "math";
+
+  // ---- 이름: 수학은 1부터 첨자, VTA는 0부터 괄호 (VTA 시뮬레이터와 같음) ----
+  function nX(b, k) { return view === "math" ? "x" + sub2(b + 1, k + 1) : '<span class="vname">X(' + (NB > 1 ? b + "," : "") + k + ")</span>"; }
+  function nW(k, j) { return view === "math" ? "W" + sub2(k + 1, j + 1) : '<span class="vname">W(' + j + "," + k + ")ᵀ</span>"; }
+  function nWplain(k, j) { return view === "math" ? "W" + sub2(k + 1, j + 1) : '<span class="vname">W(' + j + "," + k + ")</span>"; }
+  function nY(b, j) { return view === "math" ? "y" + sub2(b + 1, j + 1) : '<span class="vname">C(' + (NB > 1 ? b + "," : "") + j + ")</span>"; }
+  function prodName(b, k, j) { return view === "math" ? nX(b, k) + nW(k, j) : nX(b, k) + "·" + nW(k, j); }
+
+  function Xblk(b, k) { return slice(X, b * P.BB, (b + 1) * P.BB, k * P.BI, (k + 1) * P.BI); }
+  function Wblk(k, j) { return slice(W, k * P.BI, (k + 1) * P.BI, j * P.BO, (j + 1) * P.BO); }
+  function info(p) {
+    var nb = p.R / p.BB, nk = K / p.BI, nj = M / p.BO;
+    return {
+      x: "(" + nb + "," + nk + "," + p.BB + "," + p.BI + ")",
+      w: view === "math" ? "(" + nk + "," + nj + "," + p.BI + "," + p.BO + ")" : "(" + nj + "," + nk + "," + p.BO + "," + p.BI + ")",
+      y: "(" + nb + "," + nj + "," + p.BB + "," + p.BO + ")",
+      nb: nb, nk: nk, nj: nj, steps: nb * nk * nj, per: p.BB * p.BI * p.BO
+    };
+  }
+
+  function setup() {
+    stop();
+    P = PRESETS[+$("preset").value];
+    X = XALL.slice(0, P.R);
+    WT = T(W);
+    var s = info(P); NB = s.nb; NK = s.nk; NJ = s.nj;
+    events = [{ t: "start" }];
+    for (var b = 0; b < NB; b++) for (var j = 0; j < NJ; j++) for (var k = 0; k < NK; k++) events.push({ t: "term", b: b, j: j, k: k });
+    events.push({ t: "done" });
+    idx = 0;
+    refreshView();
+  }
+  function refreshView() {
+    var s = info(P);
+    $("subtitle").innerHTML = "(" + P.R + ",16)×(16,8) = (" + P.R + ",8)  ⇒  " + s.x + "×" + s.w + " = " + s.y +
+      (view === "math" ? "  · 축 = (B,k,BATCH,i)×(k,j,i,o) = (B,j,BATCH,o)" : "  · VTA 축 = (B,k,BATCH,i)×(j,k,o,i) = (B,j,BATCH,o)");
+    var nt = $("note");
+    var pi = +$("preset").value, link = "";
+    if (pi >= 3) link = '<br>→ 이어서 보기: <a href="vta_block_gemm_sim.html#p' + (pi + 1) + '">VTA 블록 시뮬레이터 ' + P.label + '</a> · <a href="block_matmul_schedule_math_sim.html#p' + (pi + 1) + '">스케줄링 수학 시뮬레이터 ' + P.label + "</a>";
+    if (view === "math") { nt.className = "note"; nt.innerHTML = P.note + link; }
+    else {
+      nt.className = "note vta";
+      nt.innerHTML = VTA_NOTE + (P.BI !== P.BO ? " <b>참고</b>: 이 예제의 단위 모양(" + P.BI + "×" + P.BO + ")은 개념 설명용이다. 실제 VTA는 BLOCK_IN = BLOCK_OUT이라 ⑤ 이후의 정사각형 단위만 설정할 수 있다." : "") + link;
+    }
+    $("vMath").className = view === "math" ? "on" : "";
+    $("vVta").className = view === "vta" ? "on" : "";
+    $("matTitle").innerHTML = view === "math" ? '행렬과 블록 분할 <span class="tag">x · W = y · 팔크 배치</span>'
+      : '행렬과 블록 분할 <span class="tag">VTA 보기 · x와 Wᵀ가 입력 축을 공유</span>';
+    renderSteps(); renderCompare(); render();
+  }
+
+  function replay(n) {
+    var st = { Y: {}, done: {}, cur: null, before: null, prod: null };
+    for (var e = 0; e <= n; e++) {
+      var ev = events[e]; st.cur = null; st.before = null; st.prod = null;
+      if (ev.t === "term") {
+        var key = ev.b + "," + ev.j;
+        if (!st.Y[key]) st.Y[key] = zeros(P.BB, P.BO);
+        var prod = mul(Xblk(ev.b, ev.k), Wblk(ev.k, ev.j));
+        st.before = st.Y[key]; st.Y[key] = add(st.Y[key], prod); st.prod = prod; st.cur = ev;
+        if (ev.k === NK - 1) st.done[key] = true;
+      }
+    }
+    return st;
+  }
+
+  // ---- 행렬 그리기 ----
+  function drawX(st) {
+    var g = el("div", "mat"); g.style.gridTemplateColumns = "repeat(" + K + ", max-content)";
+    for (var r = 0; r < P.R; r++) for (var c = 0; c < K; c++) {
+      var b = Math.floor(r / P.BB), k = Math.floor(c / P.BI), cls = "c";
+      if ((c + 1) % P.BI === 0 && c + 1 < K) cls += " br";
+      if ((r + 1) % P.BB === 0 && r + 1 < P.R) cls += " bb";
+      if (st.cur && st.cur.b === b && st.cur.k === k) cls += " hA";
+      else if (st.cur && st.cur.b === b) cls += " hRow";
+      g.appendChild(el("div", cls, String(X[r][c])));
+    }
+    return g;
+  }
+  function drawW(st) {  // 수학: W (16×8)
+    var g = el("div", "mat"); g.style.gridTemplateColumns = "repeat(" + M + ", max-content)";
+    for (var r = 0; r < K; r++) for (var c = 0; c < M; c++) {
+      var k = Math.floor(r / P.BI), j = Math.floor(c / P.BO), cls = "c";
+      if ((c + 1) % P.BO === 0 && c + 1 < M) cls += " br";
+      if ((r + 1) % P.BI === 0 && r + 1 < K) cls += " bb";
+      if (st.cur && st.cur.k === k && st.cur.j === j) cls += " hB";
+      else if (st.cur && st.cur.j === j) cls += " hCol";
+      g.appendChild(el("div", cls, String(W[r][c])));
+    }
+    return g;
+  }
+  function drawWT(st) { // VTA: Wᵀ (8×16), 단위 BO×BI
+    var g = el("div", "mat"); g.style.gridTemplateColumns = "repeat(" + K + ", max-content)";
+    for (var r = 0; r < M; r++) for (var c = 0; c < K; c++) {
+      var j = Math.floor(r / P.BO), k = Math.floor(c / P.BI), cls = "c";
+      if ((c + 1) % P.BI === 0 && c + 1 < K) cls += " br";
+      if ((r + 1) % P.BO === 0 && r + 1 < M) cls += " bb";
+      if (st.cur && st.cur.k === k && st.cur.j === j) cls += " hB";
+      else if (st.cur && st.cur.j === j) cls += " hCol";
+      g.appendChild(el("div", cls, String(WT[r][c])));
+    }
+    return g;
+  }
+  function yCell(st, r, c) { // y의 (행 r, 출력 c)
+    var b = Math.floor(r / P.BB), rr = r % P.BB, j = Math.floor(c / P.BO), l = c % P.BO, key = b + "," + j, cls = "", v = "·";
+    if (st.cur && st.cur.b === b && st.cur.j === j) { cls = " hC"; v = st.Y[key][rr][l]; }
+    else if (st.done[key]) { cls = " done"; v = st.Y[key][rr][l]; }
+    else if (st.Y[key]) { cls = " acc"; v = st.Y[key][rr][l]; }
+    else cls = " pend";
+    return { cls: cls, v: v };
+  }
+  function drawY(st) {
+    var g = el("div", "mat"); g.style.gridTemplateColumns = "repeat(" + M + ", max-content)";
+    for (var r = 0; r < P.R; r++) for (var c = 0; c < M; c++) {
+      var o = yCell(st, r, c), cls = "c" + o.cls;
+      if ((c + 1) % P.BO === 0 && c + 1 < M) cls += " br";
+      if ((r + 1) % P.BB === 0 && r + 1 < P.R) cls += " bb";
+      g.appendChild(el("div", cls, String(o.v)));
+    }
+    return g;
+  }
+  function drawYT(st) { // VTA: yᵀ (8×R) — Wᵀ의 행(출력)과 나란히
+    var g = el("div", "mat"); g.style.gridTemplateColumns = "repeat(" + P.R + ", max-content)";
+    for (var c = 0; c < M; c++) for (var r = 0; r < P.R; r++) {
+      var o = yCell(st, r, c), cls = "c" + o.cls;
+      if ((r + 1) % P.BB === 0 && r + 1 < P.R) cls += " br";
+      if ((c + 1) % P.BO === 0 && c + 1 < M) cls += " bb";
+      g.appendChild(el("div", cls, String(o.v)));
+    }
+    return g;
+  }
+  function mwrap(name, size, m) { var w = el("div", "mwrap"); w.appendChild(el("div", "mname", name + "<small>" + size + "</small>")); w.appendChild(m); return w; }
+  function mini(name, Mx, cls) {
+    var w = el("div", "mini " + cls); w.appendChild(el("div", "mname", name));
+    var g = el("div", "mat"); g.style.gridTemplateColumns = "repeat(" + Mx[0].length + ", max-content)";
+    Mx.forEach(function (r) { r.forEach(function (v) { g.appendChild(el("div", "c", String(v))); }); });
+    w.appendChild(g); return w;
+  }
+  function earlier(a, b) { if (a.b !== b.b) return a.b < b.b; if (a.j !== b.j) return a.j < b.j; return a.k < b.k; }
+  function termHTML(b, j, k, cur, allDone) {
+    var s = prodName(b, k, j);
+    if (allDone) return '<span class="t-done">' + s + "</span>";
+    if (!cur) return '<span class="t-future">' + s + "</span>";
+    if (b === cur.b && j === cur.j && k === cur.k) return '<span class="t-cur">' + s + "</span>";
+    return earlier({ b: b, j: j, k: k }, cur) ? '<span class="t-done">' + s + "</span>" : '<span class="t-future">' + s + "</span>";
+  }
+
+  // ---- 메모리 띠 ----
+  function addrW(r, c) { // W[r][c]의 메모리 주소
+    var k = Math.floor(r / P.BI), i = r % P.BI, j = Math.floor(c / P.BO), o = c % P.BO;
+    return view === "math" ? r * M + c : ((j * NK + k) * P.BO + o) * P.BI + i;
+  }
+  function addrX(r, c) {
+    var b = Math.floor(r / P.BB), rr = r % P.BB, k = Math.floor(c / P.BI), i = c % P.BI;
+    return view === "math" ? r * K + c : ((b * NK + k) * P.BB + rr) * P.BI + i;
+  }
+  function ranges(list) {
+    list.sort(function (a, b) { return a - b; });
+    var out = [], s = list[0], p = list[0];
+    for (var i = 1; i <= list.length; i++) {
+      if (i < list.length && list[i] === p + 1) { p = list[i]; continue; }
+      out.push(s === p ? String(s) : s + "–" + p);
+      if (i < list.length) { s = list[i]; p = list[i]; }
+    }
+    return out;
+  }
+  function stripHTML(title, total, cellsFn, unitSize, curName) {
+    var w = el("div", ""); w.appendChild(el("div", "hint", title));
+    var g = el("div", "strip"); g.style.gridTemplateColumns = "repeat(16, 26px)"; g.style.marginTop = "4px";
+    var cells = cellsFn(), curAddrs = [];
+    for (var a = 0; a < total; a++) {
+      var o = cells[a], cls = "mc" + (o.alt ? " alt" : "") + (o.cur ? " " + o.cur : "");
+      if (view === "vta" && unitSize > 1 && a % unitSize === 0 && a % 16 !== 0) cls += " cut";
+      if (o.cur) curAddrs.push(a);
+      var d = el("div", cls, String(o.v)); d.title = "주소 " + a; g.appendChild(d);
+    }
+    w.appendChild(g);
+    if (curAddrs.length) {
+      var rg = ranges(curAddrs.slice());
+      var msg = rg.length === 1 ? '<span class="good">연속 1구간</span> → 한 번에 읽기' : '<span class="bad">' + rg.length + "구간으로 흩어짐</span>";
+      w.appendChild(el("div", "addr", "지금 단위 " + curName + "의 주소: <b>" + rg.join(", ") + "</b> · " + msg));
+    } else w.appendChild(el("div", "addr", "GEMM 스텝에서 지금 단위의 주소가 표시된다."));
+    return w;
+  }
+  function renderMem(st) {
+    var box = $("mem"); box.innerHTML = "";
+    var cur = st.cur, unitW = P.BI * P.BO, unitX = P.BB * P.BI;
+    $("memTag").textContent = view === "math" ? "행 우선 저장 (C 배열 그대로)" : "VTA 블록 배치 (엔트리 = 단위, 연속)";
+    // W
+    box.appendChild(stripHTML("W의 128개 원소를 메모리 순서대로 (한 줄 16칸). 음영 = 단위 구분" + (view === "vta" ? ", 세로선 = 엔트리 경계" : ""), K * M, function () {
+      var arr = [];
+      for (var r = 0; r < K; r++) for (var c = 0; c < M; c++) {
+        var k = Math.floor(r / P.BI), j = Math.floor(c / P.BO);
+        arr[addrW(r, c)] = { v: W[r][c], alt: (j * NK + k + j) % 2 === 1, cur: cur && cur.k === k && cur.j === j ? "curW" : "" };
+      }
+      return arr;
+    }, unitW, cur ? nWplain(cur.k, cur.j) : ""));
+    // x
+    var xs = stripHTML("x의 " + (P.R * K) + "개 원소를 메모리 순서대로", P.R * K, function () {
+      var arr = [];
+      for (var r = 0; r < P.R; r++) for (var c = 0; c < K; c++) {
+        var b = Math.floor(r / P.BB), k = Math.floor(c / P.BI);
+        arr[addrX(r, c)] = { v: X[r][c], alt: (b * NK + k + b) % 2 === 1, cur: cur && cur.b === b && cur.k === k ? "curX" : "" };
+      }
+      return arr;
+    }, unitX, cur ? nX(cur.b, cur.k) : "");
+    xs.style.marginTop = "12px"; box.appendChild(xs);
+    if (view === "vta") {
+      var row = el("div", "maprow"); row.style.marginTop = "12px";
+      function entmap(title, rows, cols, fn) {
+        var w = el("div", ""); w.appendChild(el("div", "hint", title));
+        var g = el("div", "entmap"); g.style.gridTemplateColumns = "repeat(" + cols + ", 34px)";
+        for (var a = 0; a < rows; a++) for (var b2 = 0; b2 < cols; b2++) { var o = fn(a, b2); g.appendChild(el("div", "em " + o.cls, o.txt)); }
+        w.appendChild(g); return w;
+      }
+      row.appendChild(entmap("wgt 엔트리 번호 (행 j × 열 k)", NJ, NK, function (j, k) { return { txt: String(j * NK + k), cls: cur && cur.j === j && cur.k === k ? "cur" : "" }; }));
+      row.appendChild(entmap("inp 엔트리 번호 (행 b × 열 k)", NB, NK, function (b, k) { return { txt: String(b * NK + k), cls: cur && cur.b === b && cur.k === k ? "curX" : "" }; }));
+      box.appendChild(row);
+      box.appendChild(el("p", "hint", "엔트리는 출력 단위 j 순서로 이어진다. 그래서 출력 단위 몇 개분의 가중치 타일이 DRAM에서 한 덩어리가 된다."));
+    } else {
+      box.appendChild(el("p", "hint", (unitW > 1 ? "W의 단위는 여러 행에 걸쳐 있어서 행 우선 저장에서는 흩어진다. " : "") +
+        (P.BB > 1 ? "x의 단위도 " + P.BB + "행에 걸쳐 흩어진다. " : "x의 단위는 한 행 안에 있어서 원래부터 연속이다. ") + "VTA 보기로 바꿔 비교해 보자."));
+    }
+  }
+
+  // ---- 그리기 ----
+  function render() {
+    var st = replay(idx), ev = events[idx], cur = st.cur, allDone = ev.t === "done";
+    $("progress").textContent = "스텝 " + idx + " / " + (events.length - 1);
+
+    var f = $("falk"); f.innerHTML = "";
+    if (view === "math") {
+      f.className = "falk";
+      f.appendChild(el("div", "cell-tl", "W의 열 블록 ↓<br>x의 행 블록 →"));
+      f.appendChild(mwrap("W", "16×8 · 단위 " + P.BI + "×" + P.BO, drawW(st)));
+      f.appendChild(mwrap("x", P.R + "×16 · 단위 " + P.BB + "×" + P.BI, drawX(st)));
+      f.appendChild(mwrap("y", P.R + "×8 · 단위 " + P.BB + "×" + P.BO, drawY(st)));
+    } else {
+      f.className = "falk vta";
+      f.appendChild(mwrap("x", P.R + "×16 · 단위 " + P.BB + "×" + P.BI + " = inp 엔트리", drawX(st)));
+      f.appendChild(el("div", "cell-tl", "↑ x와 Wᵀ는 입력 축(열)을 공유<br>→ Wᵀ의 행 하나 = 출력 하나의 가중치"));
+      f.appendChild(mwrap("Wᵀ", "8×16 · 단위 " + P.BO + "×" + P.BI + " = wgt 엔트리", drawWT(st)));
+      f.appendChild(mwrap("yᵀ", "8×" + P.R + " · 단위 = acc 엔트리", drawYT(st)));
+    }
+
+    var bl = $("blockList"); bl.innerHTML = "";
+    for (var b = 0; b < NB; b++) for (var j = 0; j < NJ; j++) {
+      var parts = []; for (var k = 0; k < NK; k++) parts.push(termHTML(b, j, k, cur, allDone));
+      var key = b + "," + j, cls = "bl" + (cur && cur.b === b && cur.j === j ? " now" : st.done[key] ? " fin" : "");
+      bl.appendChild(el("div", cls, nY(b, j) + " = " + parts.join(" + ")));
+    }
+
+    var fo = $("formula"), calc = $("calc"), terms = $("terms"), acc = $("accum");
+    calc.innerHTML = ""; acc.innerHTML = "";
+    if (cur) {
+      var ps = []; for (k = 0; k < NK; k++) ps.push(termHTML(cur.b, cur.j, k, cur, false));
+      fo.innerHTML = nY(cur.b, cur.j) + " = " + ps.join(" + ");
+      var Xb = Xblk(cur.b, cur.k), Wb = Wblk(cur.k, cur.j), ck = cur.b + "," + cur.j;
+      calc.appendChild(mini(nX(cur.b, cur.k) + " (" + P.BB + "×" + P.BI + ")", Xb, "tA"));
+      calc.appendChild(el("span", "op", "·"));
+      if (view === "math") calc.appendChild(mini(nW(cur.k, cur.j) + " (" + P.BI + "×" + P.BO + ")", Wb, "tB"));
+      else calc.appendChild(mini(nW(cur.k, cur.j) + " · 엔트리 그대로 (" + P.BO + "×" + P.BI + ")", T(Wb), "tB"));
+      calc.appendChild(el("span", "op", "="));
+      calc.appendChild(mini((view === "math" ? prodName(cur.b, cur.k, cur.j) : "이번 항") + " (" + P.BB + "×" + P.BO + ")", st.prod, "tP"));
+      var lines = [];
+      for (var r = 0; r < P.BB; r++) for (var c = 0; c < P.BO; c++) {
+        var t = Xb[r].map(function (a, q) { return sg(a) + "×" + sg(Wb[q][c]); }).join(" + ");
+        var base = view === "math" ? 1 : 0;
+        lines.push('<span class="mut">y[' + (cur.b * P.BB + r + base) + "][" + (cur.j * P.BO + c + base) + "]  </span>" + t + ' = <span class="hl">' + st.prod[r][c] + "</span>");
+      }
+      if (view === "vta") lines.unshift('<span class="mut">// wgt 엔트리의 행 하나 = 출력 하나의 가중치 ' + P.BI + "개 → 그 행과 x 행의 내적</span>");
+      terms.innerHTML = lines.join("<br>"); terms.style.display = "";
+      acc.appendChild(mini(nY(cur.b, cur.j) + " 이전", st.before, "tC"));
+      acc.appendChild(el("span", "op", "+"));
+      acc.appendChild(mini("이번 항", st.prod, "tP"));
+      acc.appendChild(el("span", "op", "="));
+      acc.appendChild(mini(nY(cur.b, cur.j) + " 이후", st.Y[ck], "tC"));
+    } else {
+      fo.innerHTML = allDone ? "y 완성" : (view === "math" ? "y<sub>bj</sub> = Σ<sub>k</sub> x<sub>bk</sub> W<sub>kj</sub>" : '<span class="vname">C(j) = Σ<sub>k</sub> X(k) · W(j,k)ᵀ</span>');
+      terms.style.display = "none";
+    }
+
+    var ex = $("explain"), s = info(P);
+    if (ev.t === "start") {
+      ex.innerHTML = "x를 " + P.BB + "×" + P.BI + ", W를 " + P.BI + "×" + P.BO + " 단위로 나눴다. y의 단위 <b>" + (NB * NJ) + "개</b>를 각각 블록 곱 <b>" + NK + "개</b>의 합으로 구한다. 모두 <b>" + s.steps + "스텝</b>, 스텝마다 곱셈 " + s.per + "번이다." +
+        (P.R > 1 ? " W 단위 하나는 " + (P.BB > 1 ? "한 스텝에서 " + P.BB + "행이 동시에, 모두 " + NB + "번의 스텝에서" : NB + "번의 서로 다른 스텝에서") + " 쓰인다." : "");
+    } else if (ev.t === "term") {
+      var reuse = "";
+      if (P.R > 1) {
+        var used = 0; for (var e2 = 0; e2 <= idx; e2++) { var q2 = events[e2]; if (q2.t === "term" && q2.k === cur.k && q2.j === cur.j) used++; }
+        reuse = NB === 1
+          ? " (" + nWplain(cur.k, cur.j) + "는 이 스텝에서 한 번만 쓰이고, " + P.BB + "행이 동시에 쓴다)"
+          : " (" + nWplain(cur.k, cur.j) + "를 " + used + "/" + NB + "번째로 사용" + (P.BB > 1 ? ", 이번에 " + P.BB + "행이 동시에" : "") + ")";
+      }
+      ex.innerHTML = "<b>" + nY(cur.b, cur.j) + "</b>의 " + (cur.k + 1) + "번째 항: " + nX(cur.b, cur.k) + "와 " + nWplain(cur.k, cur.j) + (view === "vta" ? "의 전치" : "") + "를 곱해 " + nY(cur.b, cur.j) + "에 <b>더한다</b>" + reuse + "." +
+        (cur.k === NK - 1 ? " 마지막 항이라 " + nY(cur.b, cur.j) + "가 완성된다." : "");
+    } else {
+      ex.innerHTML = "모든 단위가 완성됐다. 블록 곱 " + s.steps + "번 × 블록 곱당 곱셈 " + s.per + "번 = 곱셈 <b>" + (s.steps * s.per) + "번</b>" +
+        (P.R === 1 ? ". 단위 크기와 상관없이 전체 곱셈 수는 128로 같다." : " = 128 × 행 " + P.R + "개. 행이 늘면 일 자체가 늘어난다.");
+    }
+
+    var res = $("result");
+    if (allDone) {
+      var ref = mul(X, W), lines2 = [], allOk = true;
+      for (r = 0; r < P.R; r++) {
+        var got = [], bb = Math.floor(r / P.BB), rr = r % P.BB;
+        for (j = 0; j < NJ; j++) got = got.concat(st.Y[bb + "," + j][rr]);
+        var ok = JSON.stringify(got) === JSON.stringify(ref[r]); allOk = allOk && ok;
+        lines2.push((P.R > 1 ? (r + 1) + "행 " : "") + "블록 계산 [" + got.join(", ") + "]" + (ok ? "" : "  ≠ 직접 곱셈 [" + ref[r].join(", ") + "]"));
+      }
+      res.innerHTML = lines2.join("<br>") + "<br>" + (allOk ? '<span class="ok">x · W를 한 번에 곱한 결과와 같다 ✓</span>' : '<span style="color:#B4501A;font-weight:700">다르다</span>');
+    } else res.innerHTML = "";
+
+    renderMem(st);
+
+    var list = $("steps").children;
+    for (var n = 0; n < list.length; n++) list[n].className = "st" + (n < idx ? " past" : n === idx ? " now" : "");
+    var now = list[idx];
+    if (now) { var box = $("steps"), top = now.offsetTop - box.offsetTop; if (top < box.scrollTop || top > box.scrollTop + box.clientHeight - 24) box.scrollTop = top - 60; }
+    $("prev").disabled = idx === 0; $("next").disabled = idx === events.length - 1;
+    var rows = $("cmp").querySelectorAll("tr[data-i]");
+    for (var q = 0; q < rows.length; q++) rows[q].className = +rows[q].dataset.i === +$("preset").value ? "me" : "";
+  }
+
+  function renderSteps() {
+    var box = $("steps"); box.innerHTML = "";
+    events.forEach(function (ev, n) {
+      var txt;
+      if (ev.t === "start") txt = "시작 · 블록 분할";
+      else if (ev.t === "done") txt = "끝 · 직접 곱셈과 비교";
+      else txt = nY(ev.b, ev.j) + (ev.k === 0 ? " = " : " += ") + prodName(ev.b, ev.k, ev.j) + (ev.k === NK - 1 ? "   → " + nY(ev.b, ev.j) + " 완성" : "");
+      var line = el("div", "st", '<span class="num">' + String(n).padStart(3, "0") + "</span>" + txt);
+      line.addEventListener("click", function () { stop(); idx = n; render(); });
+      box.appendChild(line);
+    });
+  }
+
+  function renderCompare() {
+    var h = "<tr><th>예제</th><th>4차원 표현 " + (view === "math" ? "(수학)" : "(VTA 배치)") + "</th><th>행</th><th>x 단위</th><th>W 단위</th><th>블록 곱</th><th>곱셈/블록 곱</th><th>전체 곱셈</th></tr>";
+    var lastStage = -1;
+    PRESETS.forEach(function (p, i) {
+      if (p.stage !== lastStage) { h += '<tr class="stage"><td colspan="8">' + STAGES[p.stage] + "</td></tr>"; lastStage = p.stage; }
+      var s = info(p);
+      h += '<tr data-i="' + i + '"><td>' + p.label + "</td><td>" + s.x + "×" + s.w + "=" + s.y + "</td><td>" + p.R + "</td><td>" + p.BB + "×" + p.BI + "</td><td>" +
+        (view === "math" ? p.BI + "×" + p.BO : p.BO + "×" + p.BI) + "</td><td>" + s.steps + "</td><td>" + s.per + '</td><td class="prod">' + (s.steps * s.per) + "</td></tr>";
+    });
+    $("cmp").innerHTML = h;
+    var rows = $("cmp").querySelectorAll("tr[data-i]");
+    for (var r = 0; r < rows.length; r++) rows[r].addEventListener("click", function () { $("preset").value = this.dataset.i; setup(); });
+  }
+
+  function step(d) { idx = Math.max(0, Math.min(events.length - 1, idx + d)); render(); }
+  function stop() { if (timer) { clearInterval(timer); timer = null; } var p = $("play"); if (p) p.textContent = "▶ 재생"; }
+  function play() {
+    if (timer) { stop(); return; }
+    if (idx >= events.length - 1) idx = 0;
+    $("play").textContent = "⏸ 정지";
+    timer = setInterval(function () { if (idx >= events.length - 1) { stop(); return; } step(1); }, +$("speed").value);
+  }
+  function setView(v) { if (view === v) return; view = v; refreshView(); }
+
+  $("next").addEventListener("click", function () { stop(); step(1); });
+  $("prev").addEventListener("click", function () { stop(); step(-1); });
+  $("first").addEventListener("click", function () { stop(); idx = 0; render(); });
+  $("end").addEventListener("click", function () { stop(); idx = events.length - 1; render(); });
+  $("play").addEventListener("click", play);
+  $("speed").addEventListener("input", function () { if (timer) { stop(); play(); } });
+  $("preset").addEventListener("change", setup);
+  $("vMath").addEventListener("click", function () { setView("math"); });
+  $("vVta").addEventListener("click", function () { setView("vta"); });
+  document.addEventListener("keydown", function (e) {
+    if (e.target.tagName === "SELECT" || e.target.tagName === "INPUT") return;
+    if (e.key === "ArrowRight") { stop(); step(1); e.preventDefault(); }
+    else if (e.key === "ArrowLeft") { stop(); step(-1); e.preventDefault(); }
+    else if (e.key === "Home") { stop(); idx = 0; render(); }
+    else if (e.key === "End") { stop(); idx = events.length - 1; render(); }
+    else if (e.key === " ") { play(); e.preventDefault(); }
+    else if (e.key === "v" || e.key === "V") { setView(view === "math" ? "vta" : "math"); }
+  });
+
+  // 링크로 예제 지정: 파일명#p7 → 예제 ⑦
+  var hm = /^#p(\d)$/.exec(location.hash || "");
+  if (hm && +hm[1] >= 1 && +hm[1] <= PRESETS.length) $("preset").value = String(+hm[1] - 1);
+  setup();
+})();
+</script>
+</body>
+</html>

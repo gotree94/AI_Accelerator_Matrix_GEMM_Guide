@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1220" height="440" viewBox="0 0 1220 440">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<style>
+.t{font: bold 25px sans-serif;fill:#172b4d} .h{font:bold 18px sans-serif;fill:#17324d}
+.tx{font:16px sans-serif;fill:#263746} .sm{font:13px sans-serif;fill:#526273}
+.b{stroke:#42627e;stroke-width:2;rx:12;ry:12} .arr{stroke:#657b8c;stroke-width:3;fill:none;marker-end:url(#a)}
+</style>
+<defs><marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#657b8c"/></marker></defs>
+<text x="40" y="45" class="t">행렬 연산이 사용되는 AI 모델</text>
+<rect x="80" y="130" width="430" height="190" class="b" fill="#eaf2f8"/>
+<text x="295.0" y="164" text-anchor="middle" class="h">CNN</text>
+<text x="295.0" y="193" text-anchor="middle" class="sm">Convolution → im2col → GEMM</text><rect x="650" y="130" width="470" height="190" class="b" fill="#fff0dc"/>
+<text x="885.0" y="164" text-anchor="middle" class="h">Transformer</text>
+<text x="885.0" y="193" text-anchor="middle" class="sm">QKᵀ → Softmax → V 곱셈</text><text x="120" y="380" class="sm">Feature Map · 이미지 픽셀 주변 영역을 행렬 연산으로 변환</text><text x="690" y="380" class="sm">Attention · 토큰 간 관계를 행렬 연산으로 계산</text>
+</svg>

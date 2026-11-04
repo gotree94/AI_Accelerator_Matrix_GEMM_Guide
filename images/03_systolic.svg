@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1220" height="440" viewBox="0 0 1220 440">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<style>
+.t{font: bold 25px sans-serif;fill:#172b4d} .h{font:bold 18px sans-serif;fill:#17324d}
+.tx{font:16px sans-serif;fill:#263746} .sm{font:13px sans-serif;fill:#526273}
+.b{stroke:#42627e;stroke-width:2;rx:12;ry:12} .arr{stroke:#657b8c;stroke-width:3;fill:none;marker-end:url(#a)}
+</style>
+<defs><marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#657b8c"/></marker></defs>
+<text x="40" y="45" class="t">Systolic Array: PE들이 데이터를 전달하며 연산</text>
+<rect x="100" y="130" width="150" height="70" class="b" fill="#eaf2f8"/>
+<text x="175.0" y="164" text-anchor="middle" class="h">PE(0,0)</text>
+<text x="175.0" y="193" text-anchor="middle" class="sm">MAC + 누산</text><rect x="330" y="130" width="150" height="70" class="b" fill="#eaf2f8"/>
+<text x="405.0" y="164" text-anchor="middle" class="h">PE(0,1)</text>
+<text x="405.0" y="193" text-anchor="middle" class="sm">MAC + 누산</text><rect x="560" y="130" width="150" height="70" class="b" fill="#eaf2f8"/>
+<text x="635.0" y="164" text-anchor="middle" class="h">PE(0,2)</text>
+<text x="635.0" y="193" text-anchor="middle" class="sm">MAC + 누산</text><rect x="790" y="130" width="150" height="70" class="b" fill="#eaf2f8"/>
+<text x="865.0" y="164" text-anchor="middle" class="h">PE(0,3)</text>
+<text x="865.0" y="193" text-anchor="middle" class="sm">MAC + 누산</text><rect x="100" y="235" width="150" height="70" class="b" fill="#eaf2f8"/>
+<text x="175.0" y="269" text-anchor="middle" class="h">PE(1,0)</text>
+<text x="175.0" y="298" text-anchor="middle" class="sm">MAC + 누산</text><rect x="330" y="235" width="150" height="70" class="b" fill="#eaf2f8"/>
+<text x="405.0" y="269" text-anchor="middle" class="h">PE(1,1)</text>
+<text x="405.0" y="298" text-anchor="middle" class="sm">MAC + 누산</text><rect x="560" y="235" width="150" height="70" class="b" fill="#eaf2f8"/>
+<text x="635.0" y="269" text-anchor="middle" class="h">PE(1,2)</text>
+<text x="635.0" y="298" text-anchor="middle" class="sm">MAC + 누산</text><rect x="790" y="235" width="150" height="70" class="b" fill="#eaf2f8"/>
+<text x="865.0" y="269" text-anchor="middle" class="h">PE(1,3)</text>
+<text x="865.0" y="298" text-anchor="middle" class="sm">MAC + 누산</text><rect x="100" y="340" width="150" height="70" class="b" fill="#eaf2f8"/>
+<text x="175.0" y="374" text-anchor="middle" class="h">PE(2,0)</text>
+<text x="175.0" y="403" text-anchor="middle" class="sm">MAC + 누산</text><rect x="330" y="340" width="150" height="70" class="b" fill="#eaf2f8"/>
+<text x="405.0" y="374" text-anchor="middle" class="h">PE(2,1)</text>
+<text x="405.0" y="403" text-anchor="middle" class="sm">MAC + 누산</text><rect x="560" y="340" width="150" height="70" class="b" fill="#eaf2f8"/>
+<text x="635.0" y="374" text-anchor="middle" class="h">PE(2,2)</text>
+<text x="635.0" y="403" text-anchor="middle" class="sm">MAC + 누산</text><rect x="790" y="340" width="150" height="70" class="b" fill="#eaf2f8"/>
+<text x="865.0" y="374" text-anchor="middle" class="h">PE(2,3)</text>
+<text x="865.0" y="403" text-anchor="middle" class="sm">MAC + 누산</text><path d="M250 165 L330 165" class="arr"/><path d="M480 165 L560 165" class="arr"/><path d="M710 165 L790 165" class="arr"/><path d="M250 270 L330 270" class="arr"/><path d="M480 270 L560 270" class="arr"/><path d="M710 270 L790 270" class="arr"/><path d="M250 375 L330 375" class="arr"/><path d="M480 375 L560 375" class="arr"/><path d="M710 375 L790 375" class="arr"/><text x="100" y="390" class="sm">입력과 가중치가 PE 사이를 이동하고, 각 PE가 곱셈-누산을 수행한다.</text>
+</svg>

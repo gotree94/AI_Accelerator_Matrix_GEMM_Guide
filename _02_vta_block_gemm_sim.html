@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VTA 블록 GEMM 시뮬레이터</title>
+<style>
+  :root {
+    --bg: #F7F6F1; --panel: #FFFFFF; --ink: #1D2433; --ink-soft: #4A5568; --navy: #14213D; --line: #E1DED4;
+    --orange: #E07A2F; --orange-ink: #B4501A; --orange-tint: #F9E1CE;
+    --blue: #2F6FB0; --blue-tint: #DCE8F6;
+    --green: #2E7D4F; --green-tint: #DDF0E3; --red: #B42318; --gray-tint: #EEF0F3;
+    --mono: "JetBrains Mono", "D2Coding", Consolas, "Courier New", monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; font-size: 15px; }
+  header { background: var(--navy); color: #F2EFE6; padding: 14px 24px; display: flex; flex-direction: column; gap: 10px; }
+  .titlebar { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 20px; }
+  header h1 { font-size: 20px; margin: 0; font-weight: 700; }
+  header .sub { font-size: 13px; color: #BFC8D6; font-family: var(--mono); }
+  header .sub .warn { color: #F0A35E; font-family: "Noto Sans KR", sans-serif; }
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+  .controls .grp { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-right: 12px; border-right: 1px solid #33456A; }
+  .controls .grp:last-child { border-right: none; }
+  .controls button, .controls select { font: inherit; font-size: 14px; border: 1px solid #3A4A6B; background: #22304F; color: #F2EFE6; border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+  .controls button:hover { background: #2C3D62; }
+  .controls button:disabled { opacity: .4; cursor: default; }
+  .controls button.primary { background: var(--orange); border-color: var(--orange); color: #1D2433; font-weight: 700; }
+  .controls label { font-size: 13px; color: #BFC8D6; display: flex; align-items: center; gap: 6px; }
+  .controls input[type=range] { width: 80px; }
+  .progress { font-family: var(--mono); font-size: 13px; color: #F0A35E; min-width: 110px; }
+
+  main { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr) minmax(360px, 1.1fr); gap: 16px; padding: 16px 24px 8px; }
+  @media (max-width: 1150px) { main { grid-template-columns: 1fr; padding: 12px 16px; } header { padding: 12px 16px; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px 16px; min-width: 0; }
+  .panel h2 { font-size: 15px; margin: 0 0 10px; color: var(--navy); display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .panel h2 .tag { font-size: 11px; font-weight: 500; letter-spacing: 1px; color: var(--orange-ink); }
+  .panel h3 { font-size: 13px; margin: 14px 0 6px; color: var(--ink-soft); font-weight: 600; }
+  .panel h3:first-of-type { margin-top: 0; }
+  .hint { font-size: 12px; color: var(--ink-soft); margin: 6px 0 0; line-height: 1.55; }
+  .scroll { overflow-x: auto; padding-bottom: 4px; }
+
+  .vals { display: inline-grid; gap: 2px; }
+  .v { font-family: var(--mono); font-size: 11px; width: 22px; height: 19px; display: flex; align-items: center; justify-content: center; background: #F3F2EC; border-radius: 3px; }
+  .blk { border: 2px solid transparent; border-radius: 8px; padding: 3px 4px 4px; background: var(--gray-tint); display: inline-flex; flex-direction: column; gap: 3px; transition: background .2s, border-color .2s; }
+  .blk .lbl { font-size: 10.5px; font-weight: 700; color: var(--ink-soft); font-family: var(--mono); display: flex; justify-content: space-between; gap: 6px; white-space: nowrap; }
+  .blk .id { color: #8C96A8; font-weight: 400; }
+  .blk .badge { color: var(--red); }
+  .blk.empty { opacity: .35; }
+  .blk.loaded { background: var(--blue-tint); }
+  .blk.tile { background: var(--orange-tint); }
+  .blk.done { background: var(--green-tint); }
+  .blk.cur { border-color: var(--orange); box-shadow: 0 0 0 3px rgba(224,122,47,.25); }
+  .blk.cur .lbl { color: var(--orange-ink); }
+  .blk.reload { border-color: var(--red); border-style: dashed; }
+
+  .rows { display: flex; flex-direction: column; gap: 6px; }
+  .srow { display: flex; flex-wrap: nowrap; align-items: center; gap: 5px; }
+  .srow .sl { font-size: 11px; font-family: var(--mono); color: var(--ink-soft); min-width: 34px; }
+  .wgrid { display: grid; gap: 5px; align-items: center; }
+  .wgrid .ax { font-size: 11px; color: var(--ink-soft); font-family: var(--mono); text-align: center; }
+  .slots { display: flex; flex-wrap: wrap; gap: 5px; }
+  .cap { font-size: 12px; font-family: var(--mono); color: var(--ink-soft); font-weight: 400; }
+  .invalid { background: #FDECEA; color: var(--red); border-radius: 8px; padding: 10px 12px; font-size: 14px; line-height: 1.6; }
+
+  .core { display: flex; flex-direction: column; gap: 10px; }
+  .eq { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .op { font-size: 20px; color: var(--ink-soft); font-family: var(--mono); }
+  .dots { font-family: var(--mono); font-size: 12.5px; line-height: 1.7; background: #1D2433; color: #E8E4D8; padding: 10px 12px; border-radius: 10px; overflow-x: auto; white-space: nowrap; max-height: 230px; overflow-y: auto; }
+  .dots .hl { color: #F0A35E; }
+  .dots .mut { color: #8FA3BF; }
+  .explain { font-size: 14.5px; line-height: 1.6; background: #FFF8F1; border-left: 4px solid var(--orange); padding: 10px 14px; border-radius: 6px; min-height: 72px; }
+  .explain b { color: var(--orange-ink); }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: 8px; }
+  .stat { background: #F3F2EC; border-radius: 10px; padding: 7px 10px; }
+  .stat .k { font-size: 11px; color: var(--ink-soft); }
+  .stat .n { font-family: var(--mono); font-size: 16px; font-weight: 700; color: var(--navy); }
+  .stat.total { background: var(--navy); }
+  .stat.total .k { color: #BFC8D6; }
+  .stat.total .n { color: #F0A35E; }
+  .stat.hw { background: #EAF1FA; }
+
+  .cmp { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .cmp th, .cmp td { padding: 6px 7px; border-bottom: 1px solid var(--line); text-align: right; font-family: var(--mono); white-space: nowrap; }
+  .cmp th { font-family: inherit; font-size: 12px; color: var(--ink-soft); font-weight: 600; }
+  .cmp td:first-child, .cmp th:first-child { text-align: left; font-family: inherit; }
+  .cmp tr.me td { background: #FFF3E0; font-weight: 700; }
+  .cmp tr.best td:last-child { color: var(--green); }
+  .cmp td.na { color: #A0A8B5; font-family: inherit; }
+  .verdict { font-size: 13.5px; line-height: 1.6; margin-top: 8px; }
+  .verdict b { color: var(--green); }
+  .nform { font-family: var(--mono); font-size: 12.5px; line-height: 1.75; background: #F3F2EC; border-radius: 8px; padding: 8px 12px; margin-top: 8px; color: var(--ink); }
+  .nform b { color: var(--navy); }
+  .result { font-family: var(--mono); font-size: 12.5px; line-height: 1.7; }
+  .ok { color: var(--green); font-weight: 700; }
+
+  footer { padding: 0 24px 24px; }
+  @media (max-width: 1150px) { footer { padding: 0 16px 16px; } }
+  .stream { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 16px; }
+  .stream h2 { font-size: 15px; margin: 0 0 8px; color: var(--navy); }
+  .insns { max-height: 170px; overflow-y: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.75; }
+  .insn { padding: 0 8px; border-radius: 4px; cursor: pointer; color: var(--ink-soft); white-space: nowrap; }
+  .insn.past { color: var(--ink); }
+  .insn.now { background: var(--orange-tint); color: var(--orange-ink); font-weight: 700; }
+  .insn .op-l { display: inline-block; width: 86px; }
+  .op-LOAD { color: var(--blue); }
+  .op-GEMM { color: var(--orange-ink); }
+  .op-STORE { color: var(--green); }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--ink-soft); margin-top: 10px; }
+  .legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -2px; background: var(--c); border: 2px solid var(--b, transparent); }
+</style>
+</head>
+<body>
+<header>
+  <div class="titlebar">
+    <h1>VTA 블록 GEMM 시뮬레이터</h1>
+    <div class="sub" id="subtitle"></div>
+  </div>
+  <div class="controls">
+    <div class="grp">
+      <label>예제
+        <select id="preset">
+          <option value="custom">직접 설정</option>
+          <option value="3">④ 행 1 · 블록 4×2</option>
+          <option value="4">⑤ 행 1 · 블록 4×4</option>
+          <option value="5">⑥ 행 2 · 블록 4×4</option>
+          <option value="6" selected>⑦ 행 4 · 블록 4×4</option>
+          <option value="7">⑧ 행 4 · BATCH 2</option>
+          <option value="8">⑨ 행 4 · BATCH 4</option>
+        </select>
+      </label>
+    </div>
+    <div class="grp">
+      <label>행 수 B
+        <select id="cfgB"><option value="1">1</option><option value="2">2</option><option value="4">4</option></select>
+      </label>
+      <label>W 블록
+        <select id="cfgBO"><option value="2">4×2 (BLOCK_OUT 2)</option><option value="4">4×4 (BLOCK_OUT 4)</option></select>
+      </label>
+      <label>BATCH
+        <select id="cfgBT"><option value="1">1</option><option value="2">2</option><option value="4">4</option></select>
+      </label>
+      <label>입력 버퍼
+        <select id="cfgI"><option value="16">16 B</option><option value="32">32 B</option><option value="64">64 B</option></select>
+      </label>
+      <label>가중치 버퍼
+        <select id="cfgW"><option value="32">32 B</option><option value="64">64 B</option><option value="128">128 B</option></select>
+      </label>
+      <label>루프 순서
+        <select id="cfgO"><option value="is">입력 고정</option><option value="ws">가중치 고정</option></select>
+      </label>
+    </div>
+    <div class="grp">
+      <button id="first" title="처음 (Home)">⏮</button>
+      <button id="prev" title="이전 (←)">◀ 이전</button>
+      <button id="next" class="primary" title="다음 (→)">다음 ▶</button>
+      <button id="play" title="재생/정지 (Space)">▶ 재생</button>
+      <button id="end" title="끝으로 (End)">⏭</button>
+      <label>속도 <input id="speed" type="range" min="100" max="2000" step="100" value="700"></label>
+      <span class="progress" id="progress"></span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="panel">
+    <h2>DRAM <span class="tag">메인 메모리 · #n = 엔트리 번호(메모리 순서)</span></h2>
+    <h3 id="hX"></h3>
+    <div class="scroll"><div class="rows" id="dramX"></div></div>
+    <h3 id="hW"></h3>
+    <div class="scroll"><div class="wgrid" id="dramW"></div></div>
+    <h3 id="hY"></h3>
+    <div class="scroll"><div class="rows" id="dramY"></div></div>
+    <div class="legend">
+      <span style="--c: var(--blue-tint)">버퍼에 올라간 적 있음</span>
+      <span style="--c: var(--orange-tint)">지금 버퍼에 있음</span>
+      <span style="--c: var(--green-tint)">계산 완료</span>
+      <span style="--c: #fff; --b: var(--orange)">지금 사용 중</span>
+      <span style="--c: #fff; --b: var(--red)"><b style="color:var(--red)">×n</b> = DRAM에서 n번 읽음</span>
+    </div>
+    <p class="hint">엔트리 하나는 메모리에 연속으로 놓여 있어서 DMA가 통째로 가져간다. 엔트리 번호는 W(j,k) = j×4 + k, X(b,k) = b×4 + k 순서다.</p>
+  </section>
+
+  <section class="panel">
+    <h2>온칩 버퍼 <span class="tag">SRAM</span></h2>
+    <h3>inp_ 입력 버퍼 <span class="cap" id="capI"></span></h3>
+    <div class="slots" id="bufInp"></div>
+    <h3>wgt_ 가중치 버퍼 <span class="cap" id="capW"></span></h3>
+    <div class="slots" id="bufWgt"></div>
+    <h3>acc_ 누산기 (int32) <span class="cap">· 지금 타일이 쓰는 엔트리</span></h3>
+    <div class="slots" id="bufAcc"></div>
+    <p class="hint">VTA는 store가 int8만 내보내서 중간 합(int32)을 DRAM에 내릴 수 없다. 그래서 합산 축 k는 칩 안에서 끝내고(출력 고정), 그 바깥에서 입력 고정과 가중치 고정 중 하나를 고른다.</p>
+    <p class="hint"><b>이 시뮬레이터의 단순화</b>: 행 묶음 하나의 입력 엔트리(k 전체)와 출력 단위 하나의 가중치 엔트리(k 전체)가 버퍼에 한꺼번에 들어간다고 가정한다(k를 쪼개지 않음). 또 load와 GEMM을 겹치지 않고 차례로 실행한다. 실제 VTA는 k를 나눠 흘려보내거나(누산기는 칩에 유지), virtual_thread로 load와 계산을 겹칠 수 있다. 겹치기는 시간축 시뮬레이터에서 다룬다.</p>
+    <p class="hint"><b>이상적인 모델</b>: 바로 전 타일과 같은 엔트리가 이미 버퍼에 있으면 다시 읽지 않는다. 실제 TVM 코드는 compute_at을 붙인 루프가 돌 때마다 load를 다시 실행하므로, 같은 설정이라도 트래픽이 더 나올 수 있다 (→ vta_schedule_compare.html).</p>
+  </section>
+
+  <section class="panel">
+    <h2>GEMM 코어 <span class="tag">한 스텝</span></h2>
+    <div class="core">
+      <div class="eq" id="coreEq"></div>
+      <div class="dots" id="coreDots"></div>
+      <div class="explain" id="explain"></div>
+      <div class="stats" id="stats"></div>
+      <div>
+        <h3 style="margin-top:4px">루프 순서 비교 <span class="cap">· 같은 설정, 순서만 바꾸면</span></h3>
+        <table class="cmp" id="cmp"></table>
+        <div class="verdict" id="verdict"></div>
+      </div>
+      <div>
+        <h3 style="margin-top:4px">BATCH 비교 <span class="cap">· 같은 버퍼 크기, 더 나은 순서 기준</span></h3>
+        <table class="cmp" id="cmpB"></table>
+        <div class="verdict" id="verdictB"></div>
+      </div>
+      <div class="result" id="result"></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="stream">
+    <h2>명령어 스트림 <span style="font-size:12px;font-weight:400;color:var(--ink-soft)">· 줄을 누르면 그 스텝으로 이동</span></h2>
+    <div class="insns" id="insns"></div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---- 데이터 (수학 시뮬레이터와 같은 값) ----
+  var BI = 4, K = 16, M = 8, NK = K / BI;
+  var XS = [
+    [2, 1, 0, -2, -1, -3, -3, -3, -2, 2, 1, 3, 0, 1, 3, 2],
+    [3, 1, 1, 3, 1, 2, 2, -2, -3, -1, -2, 3, 3, -3, 0, 2],
+    [-3, 2, -3, 0, 2, -1, -1, -2, 2, -2, 3, 0, 0, 0, 1, 0],
+    [0, 3, 2, 2, 1, 1, -1, 3, 0, -2, 2, -2, 3, 1, -3, -3]
+  ];
+  var W = [
+    [1, 0, 0, 3, -2, 2, 1, -3], [-1, 3, 0, -3, 2, 2, 2, -2], [-3, 3, -3, 0, -3, -1, 0, -1], [-1, -3, -3, -3, -3, 1, 0, 1],
+    [-2, 1, 2, -1, 0, 3, 2, 3], [-1, 1, 3, 1, 2, 1, 1, -1], [3, -3, 1, 2, 2, 0, -1, -1], [-1, 0, 2, 3, -3, 3, 0, -1],
+    [1, 1, -2, -1, 2, 1, 0, -1], [2, -1, -1, 3, -2, -2, 1, 1], [-3, -3, -1, 2, -1, 2, -1, -2], [2, 3, -3, -3, 1, -1, 1, -2],
+    [3, 0, 3, 2, 1, -2, 2, -3], [0, -1, 3, -2, 3, -3, 1, 1], [3, -1, 3, 1, 3, -2, 2, 3], [-3, -1, 1, -3, 0, 1, 2, 3]
+  ];
+
+  // 수학 시뮬레이터 예제 번호와 같은 설정 (버퍼는 바이트)
+  var PRESETS = {
+    "3": { B: 1, BO: 2, BT: 1, I: 16, W: 64, O: "is", label: "④", josa: "와" },
+    "4": { B: 1, BO: 4, BT: 1, I: 16, W: 64, O: "is", label: "⑤", josa: "와" },
+    "5": { B: 2, BO: 4, BT: 1, I: 16, W: 64, O: "is", label: "⑥", josa: "과" },
+    "6": { B: 4, BO: 4, BT: 1, I: 16, W: 64, O: "is", label: "⑦", josa: "과" },
+    "7": { B: 4, BO: 4, BT: 2, I: 32, W: 64, O: "is", label: "⑧", josa: "과" },
+    "8": { B: 4, BO: 4, BT: 4, I: 64, W: 64, O: "is", label: "⑨", josa: "와" }
+  };
+
+  // ---- 블록 ----
+  function Xe(c, b, k) { // X(b,k) 엔트리: BATCH × BI
+    var e = [];
+    for (var r = 0; r < c.BT; r++) e.push(XS[b * c.BT + r].slice(k * BI, (k + 1) * BI));
+    return e;
+  }
+  function We(c, j, k) { // W(j,k) 엔트리: BO × BI = [출력 o][입력 i] (전치해 묶은 결과)
+    var e = [];
+    for (var o = 0; o < c.BO; o++) { var r = []; for (var i = 0; i < BI; i++) r.push(W[k * BI + i][j * c.BO + o]); e.push(r); }
+    return e;
+  }
+  function refRow(r) { var y = []; for (var o = 0; o < M; o++) { var t = 0; for (var i = 0; i < K; i++) t += XS[r][i] * W[i][o]; y.push(t); } return y; }
+
+  // ---- 계획 ----
+  function groups(n, size) { var g = []; for (var a = 0; a < n; a += size) { var r = []; for (var b = a; b < Math.min(n, a + size); b++) r.push(b); g.push(r); } return g; }
+  function sizes(c) {
+    var s = { NB: c.B / c.BT, NJ: M / c.BO, inEB: c.BT * BI, wEB: c.BO * BI, outEB: c.BT * c.BO };
+    s.inEnt = Math.floor(c.I / s.inEB); s.wEnt = Math.floor(c.W / s.wEB);
+    s.rbPer = Math.floor(s.inEnt / NK); s.ojPer = Math.floor(s.wEnt / NK);
+    s.mults = c.BT * BI * c.BO;
+    return s;
+  }
+  function validity(c) {
+    var s = sizes(c);
+    if (c.BT > c.B) return "BATCH(" + c.BT + ")가 행 수(" + c.B + ")보다 크다.";
+    if (s.rbPer < 1) return "입력 버퍼 " + c.I + " B가 행 묶음 하나의 입력 엔트리 4개(" + (NK * s.inEB) + " B)를 담지 못한다. 이 시뮬레이터는 k를 쪼개지 않으므로 입력 버퍼를 " + (NK * s.inEB) + " B 이상으로 늘려야 한다.";
+    if (s.ojPer < 1) return "가중치 버퍼 " + c.W + " B가 출력 단위 하나의 가중치 엔트리 4개(" + (NK * s.wEB) + " B)를 담지 못한다. 가중치 버퍼를 " + (NK * s.wEB) + " B 이상으로 늘려야 한다.";
+    return null;
+  }
+  function buildPlan(c) {
+    var s = sizes(c), bad = validity(c);
+    if (bad) return { invalid: bad, ev: [{ t: "start" }], s: s };
+    var inT = groups(s.NB, s.rbPer), wT = groups(s.NJ, s.ojPer);
+    var ev = [{ t: "start" }], resIn = -1, resW = -1;
+    function body(ig, wg) {
+      var bs = inT[ig], js = wT[wg];
+      if (resIn !== ig) { ev.push({ t: "loadInp", bs: bs, tile: ig + 1 }); resIn = ig; }
+      if (resW !== wg) { ev.push({ t: "loadWgt", js: js, tile: wg + 1 }); resW = wg; }
+      var pairs = []; bs.forEach(function (b) { js.forEach(function (j) { pairs.push([b, j]); }); });
+      ev.push({ t: "reset", pairs: pairs });
+      pairs.forEach(function (p) { for (var k = 0; k < NK; k++) ev.push({ t: "gemm", b: p[0], j: p[1], k: k }); });
+      ev.push({ t: "store", pairs: pairs });
+    }
+    if (c.O === "is") { for (var a = 0; a < inT.length; a++) for (var b = 0; b < wT.length; b++) body(a, b); }
+    else { for (var b2 = 0; b2 < wT.length; b2++) for (var a2 = 0; a2 < inT.length; a2++) body(a2, b2); }
+    ev.push({ t: "done" });
+    return { ev: ev, s: s, inTiles: inT.length, wTiles: wT.length };
+  }
+  function traffic(c) {
+    var p = buildPlan(c);
+    if (p.invalid) return null;
+    var t = { inp: 0, wgt: 0, out: 0, gemm: 0 };
+    p.ev.forEach(function (e) {
+      if (e.t === "loadInp") t.inp += e.bs.length * NK * p.s.inEB;
+      if (e.t === "loadWgt") t.wgt += e.js.length * NK * p.s.wEB;
+      if (e.t === "store") t.out += e.pairs.length * p.s.outEB;
+      if (e.t === "gemm") t.gemm++;
+    });
+    t.total = t.inp + t.wgt + t.out; return t;
+  }
+
+  // ---- 재생 ----
+  function replay(c, plan, idx) {
+    var s = plan.s;
+    var st = { inp: [], wgt: [], acc: {}, accList: [], y: {}, inCnt: {}, wCnt: {}, inEver: {}, wEver: {},
+               gemm: 0, inpB: 0, wgtB: 0, outB: 0, cur: null, before: null, part: null };
+    for (var n = 0; n <= idx; n++) {
+      var e = plan.ev[n]; st.cur = null; st.before = null; st.part = null;
+      if (e.t === "loadInp") {
+        st.inp = [];
+        e.bs.forEach(function (b) { for (var k = 0; k < NK; k++) { st.inp.push({ b: b, k: k }); var key = b + "," + k; st.inCnt[key] = (st.inCnt[key] || 0) + 1; st.inEver[key] = true; } });
+        st.inpB += e.bs.length * NK * s.inEB;
+      } else if (e.t === "loadWgt") {
+        st.wgt = [];
+        e.js.forEach(function (j) { for (var k = 0; k < NK; k++) { st.wgt.push({ j: j, k: k }); var key = j + "," + k; st.wCnt[key] = (st.wCnt[key] || 0) + 1; st.wEver[key] = true; } });
+        st.wgtB += e.js.length * NK * s.wEB;
+      } else if (e.t === "reset") {
+        st.acc = {}; st.accList = e.pairs.slice();
+        e.pairs.forEach(function (p) { st.acc[p[0] + "," + p[1]] = zeros(c.BT, c.BO); });
+      } else if (e.t === "gemm") {
+        var xe = Xe(c, e.b, e.k), we = We(c, e.j, e.k), key = e.b + "," + e.j;
+        var part = xe.map(function (xr) { return we.map(function (wr) { return wr.reduce(function (a, w, i) { return a + w * xr[i]; }, 0); }); });
+        st.before = st.acc[key];
+        st.acc[key] = st.acc[key].map(function (r, ri) { return r.map(function (v, o) { return v + part[ri][o]; }); });
+        st.part = part; st.cur = e; st.gemm++;
+      } else if (e.t === "store") {
+        e.pairs.forEach(function (p) { var key = p[0] + "," + p[1]; st.y[key] = st.acc[key]; });
+        st.outB += e.pairs.length * s.outEB;
+      }
+    }
+    return st;
+  }
+  function zeros(r, c) { var z = []; for (var i = 0; i < r; i++) { z.push([]); for (var j = 0; j < c; j++) z[i].push(0); } return z; }
+
+  // ---- 그리기 도우미 ----
+  function el(tag, cls, html) { var d = document.createElement(tag); if (cls) d.className = cls; if (html != null) d.innerHTML = html; return d; }
+  function valsGrid(data, rows, cols) {
+    var g = el("div", "vals"); g.style.gridTemplateColumns = "repeat(" + cols + ", 22px)";
+    for (var r = 0; r < rows; r++) for (var c2 = 0; c2 < cols; c2++) g.appendChild(el("div", "v", data ? String(data[r][c2]) : "·"));
+    return g;
+  }
+  function block(label, id, badge, data, rows, cols, cls) {
+    var b = el("div", "blk " + (cls || ""));
+    b.appendChild(el("div", "lbl", "<span>" + label + (id != null ? ' <span class="id">#' + id + "</span>" : "") + "</span>" + (badge ? '<span class="badge">' + badge + "</span>" : "")));
+    b.appendChild(valsGrid(data, rows, cols));
+    return b;
+  }
+  function sg(n) { return n < 0 ? "(" + n + ")" : String(n); }
+  function fmt(a) { return "[" + a.join(", ") + "]"; }
+
+  // ---- 이름 (수학 시뮬레이터 VTA 보기와 같은 규칙: 행 묶음이 하나면 b 생략) ----
+  var cfg, plan, idx = 0, timer = null;
+  function nX(b, k) { return "X(" + (plan.s.NB > 1 ? b + "," : "") + k + ")"; }
+  function nW(j, k) { return "W(" + j + "," + k + ")"; }
+  function nC(b, j) { return "C(" + (plan.s.NB > 1 ? b + "," : "") + j + ")"; }
+  function rowsOf(b) { return cfg.BT === 1 ? "행 " + (b * cfg.BT) : "행 " + (b * cfg.BT) + "–" + (b * cfg.BT + cfg.BT - 1); }
+
+  var $ = function (id) { return document.getElementById(id); };
+  function readCfg() { return { B: +$("cfgB").value, BO: +$("cfgBO").value, BT: +$("cfgBT").value, I: +$("cfgI").value, W: +$("cfgW").value, O: $("cfgO").value }; }
+  function applyPreset(key) {
+    var p = PRESETS[key]; if (!p) return;
+    $("cfgB").value = p.B; $("cfgBO").value = p.BO; $("cfgBT").value = p.BT; $("cfgI").value = p.I; $("cfgW").value = p.W; $("cfgO").value = p.O;
+  }
+  function syncPreset() {
+    var c = readCfg(), found = "custom";
+    Object.keys(PRESETS).forEach(function (k) { var p = PRESETS[k]; if (p.B === c.B && p.BO === c.BO && p.BT === c.BT && p.I === c.I && p.W === c.W) found = k; });
+    $("preset").value = found;
+  }
+  function reset() {
+    stop();
+    // BATCH는 행 수를 나누어야 한다
+    var bt = $("cfgBT");
+    for (var i = 0; i < bt.options.length; i++) { var v = +bt.options[i].value; bt.options[i].disabled = v > +$("cfgB").value; }
+    if (+bt.value > +$("cfgB").value) bt.value = $("cfgB").value === "2" ? "2" : "1";
+    cfg = readCfg();
+    plan = buildPlan(cfg);
+    idx = 0;
+    renderStream(); renderCompare(); render();
+  }
+
+  function eventText(e) {
+    var s = plan.s;
+    if (e.t === "start") return ["", "시작", "버퍼가 모두 비어 있다"];
+    if (e.t === "loadInp") return ["LOAD", "INP", "입력 타일 " + e.tile + ": " + e.bs.map(function (b) { return nX(b, "0..3"); }).join(", ") + " → inp_  (" + (e.bs.length * NK * s.inEB) + " B)"];
+    if (e.t === "loadWgt") return ["LOAD", "WGT", "가중치 타일 " + e.tile + ": " + e.js.map(function (j) { return "W(" + j + ",0..3)"; }).join(", ") + " → wgt_  (" + (e.js.length * NK * s.wEB) + " B)"];
+    if (e.t === "reset") return ["GEMM", "RESET", e.pairs.map(function (p) { return nC(p[0], p[1]); }).join(", ") + " ← 0"];
+    if (e.t === "gemm") return ["GEMM", "", nC(e.b, e.j) + " += " + nX(e.b, e.k) + " · " + nW(e.j, e.k) + "ᵀ"];
+    if (e.t === "store") return ["STORE", "OUT", e.pairs.map(function (p) { return nC(p[0], p[1]); }).join(", ") + " → y  (" + (e.pairs.length * s.outEB) + " B)"];
+    return ["", "끝", "y = x · W 검증"];
+  }
+  function renderStream() {
+    var box = $("insns"); box.innerHTML = "";
+    plan.ev.forEach(function (e, n) {
+      var t = eventText(e), line = el("div", "insn");
+      var opc = t[0] ? '<span class="op-l op-' + t[0] + '">' + t[0] + (t[1] ? "." + t[1] : "") + "</span>" : '<span class="op-l">' + t[1] + "</span>";
+      line.innerHTML = String(n).padStart(3, "0") + "  " + opc + " " + t[2];
+      line.addEventListener("click", function () { stop(); idx = n; render(); });
+      box.appendChild(line);
+    });
+  }
+
+  function renderCompare() {
+    // 루프 순서 비교
+    var a = traffic({ B: cfg.B, BO: cfg.BO, BT: cfg.BT, I: cfg.I, W: cfg.W, O: "is" });
+    var b = traffic({ B: cfg.B, BO: cfg.BO, BT: cfg.BT, I: cfg.I, W: cfg.W, O: "ws" });
+    var minimal = cfg.B * K + K * M + cfg.B * M;
+    if (!a) {
+      $("cmp").innerHTML = ""; $("verdict").innerHTML = '<span class="cap">설정을 고치면 비교가 나온다.</span>';
+    } else {
+      var best = Math.min(a.total, b.total);
+      var row = function (key, name, d) { return '<tr class="' + (cfg.O === key ? "me" : "") + (d.total === best ? " best" : "") + '"><td>' + name + "</td><td>" + d.inp + "</td><td>" + d.wgt + "</td><td>" + d.out + "</td><td>" + d.total + " B</td></tr>"; };
+      $("cmp").innerHTML = "<tr><th>순서</th><th>입력</th><th>가중치</th><th>출력</th><th>DRAM 합계</th></tr>" + row("is", "입력 고정", a) + row("ws", "가중치 고정", b);
+      $("verdict").innerHTML = a.total === b.total ? "두 순서가 <b>같다</b>. 버퍼에 충분히 들어가서 어느 쪽도 다시 읽지 않는다 (최소 " + minimal + " B)." :
+        "<b>" + (a.total < b.total ? "입력 고정" : "가중치 고정") + "</b>이 " + Math.abs(a.total - b.total) + " B 적다 (" + Math.round(Math.max(a.total, b.total) / Math.min(a.total, b.total) * 10) / 10 + "배). 결과와 GEMM 스텝은 같다. 최소는 " + minimal + " B.";
+      // n_I, n_W 식 (이상적인 모델)
+      var fs = sizes(cfg), nI = Math.ceil(fs.NB / fs.rbPer), nW = Math.ceil(fs.NJ / fs.ojPer), iD = cfg.B * K, wD = K * M, oD = cfg.B * M;
+      var fIS = iD + wD * (nW > 1 ? nI : 1), fWS = wD + iD * (nI > 1 ? nW : 1);
+      var fl = [];
+      fl.push("<b>n_I</b> = 입력 타일 수 = ⌈행 묶음 " + fs.NB + " ÷ 버퍼에 담는 " + fs.rbPer + "⌉ = <b>" + nI + "</b>" + (nI === 1 ? " (입력이 버퍼에 다 들어감)" : ""));
+      fl.push("<b>n_W</b> = 가중치 타일 수 = ⌈출력 단위 " + fs.NJ + " ÷ 버퍼에 담는 " + fs.ojPer + "⌉ = <b>" + nW + "</b>" + (nW === 1 ? " (가중치가 버퍼에 다 들어감)" : ""));
+      fl.push(nW > 1 ? "입력 고정 = inp_d + n_I × wgt_d = " + iD + " + " + nI + " × " + wD + " = <b>" + fIS + " B</b>"
+                     : "입력 고정 = inp_d + wgt_d = " + iD + " + " + wD + " = <b>" + fIS + " B</b> (n_W = 1이라 가중치를 다시 읽지 않음)");
+      fl.push(nI > 1 ? "가중치 고정 = n_W × inp_d + wgt_d = " + nW + " × " + iD + " + " + wD + " = <b>" + fWS + " B</b>"
+                     : "가중치 고정 = inp_d + wgt_d = " + iD + " + " + wD + " = <b>" + fWS + " B</b> (n_I = 1이라 입력을 다시 읽지 않음)");
+      fl.push("여기에 출력 " + oD + " B를 더하면 위 표의 합계가 된다. 둘 중 작은 쪽을 고르는 것이 스케줄링이다.");
+      $("verdict").innerHTML += '<div class="nform">' + fl.join("<br>") + "</div>";
+    }
+    // BATCH 비교 (같은 버퍼)
+    var h = "<tr><th>BATCH</th><th>곱셈기</th><th>GEMM 스텝</th><th>wgt_ 읽기</th><th>DRAM 합계</th></tr>";
+    [1, 2, 4].forEach(function (bt) {
+      if (bt > cfg.B || cfg.B % bt) return;
+      var c1 = { B: cfg.B, BO: cfg.BO, BT: bt, I: cfg.I, W: cfg.W, O: "is" }, c2 = { B: cfg.B, BO: cfg.BO, BT: bt, I: cfg.I, W: cfg.W, O: "ws" };
+      var t1 = traffic(c1), t2 = traffic(c2), mults = bt * BI * cfg.BO;
+      if (!t1) { h += '<tr class="' + (bt === cfg.BT ? "me" : "") + '"><td>' + bt + "</td><td>" + mults + '</td><td colspan="3" class="na">입력 버퍼 부족 (행 묶음 하나에 ' + (NK * bt * BI) + " B 필요)</td></tr>"; return; }
+      var tb = Math.min(t1.total, t2.total);
+      h += '<tr class="' + (bt === cfg.BT ? "me" : "") + '"><td>' + bt + "</td><td>" + mults + "</td><td>" + t1.gemm + "</td><td>" + t1.gemm + "</td><td>" + tb + " B</td></tr>";
+    });
+    $("cmpB").innerHTML = h;
+    $("verdictB").innerHTML = cfg.B === 1 ? "행이 1개라 BATCH는 1만 가능하다." :
+      "같은 버퍼 크기에서 BATCH를 키우면 <b>GEMM 스텝과 wgt_ 읽기가 줄고</b>, 곱셈기가 늘어난다. 스텝마다 wgt_ 엔트리를 하나 읽어 BATCH개 행이 동시에 쓰기 때문이다. DRAM 트래픽은 버퍼가 몇 행분을 담느냐로 정해지므로, 같은 바이트의 버퍼라면 BATCH를 바꿔도 크게 달라지지 않는다.";
+  }
+
+  function render() {
+    var s = plan.s;
+    $("progress").textContent = "스텝 " + idx + " / " + (plan.ev.length - 1);
+    var p = PRESETS[$("preset").value];
+    $("subtitle").innerHTML = (p ? "수학 예제 " + p.label + p.josa + " 같은 설정 · " : "") +
+      "x (" + cfg.B + ",16) → (" + s.NB + "," + NK + "," + cfg.BT + "," + BI + ") · W → (" + s.NJ + "," + NK + "," + cfg.BO + "," + BI + ") · y → (" + s.NB + "," + s.NJ + "," + cfg.BT + "," + cfg.BO + ")" +
+      (cfg.BO !== BI ? ' <span class="warn">· 4×2 블록은 개념 설명용 (실제 VTA는 BLOCK_IN = BLOCK_OUT)</span>' : "");
+    $("hX").textContent = "입력 x → 엔트리 X(b,k), " + cfg.BT + "×" + BI + " (int8, " + s.inEB + " B)";
+    $("hW").textContent = "가중치 → 엔트리 W(j,k), " + cfg.BO + "×" + BI + " [출력][입력] (int8, " + s.wEB + " B)";
+    $("hY").textContent = "출력 y → 엔트리 C(b,j), " + cfg.BT + "×" + cfg.BO + " (int8로 store, " + s.outEB + " B)";
+
+    var ex = $("explain");
+    if (plan.invalid) {
+      ["dramX", "dramW", "dramY", "bufInp", "bufWgt", "bufAcc", "coreEq"].forEach(function (id) { $(id).innerHTML = ""; });
+      $("coreDots").style.display = "none";
+      ex.innerHTML = '<div class="invalid">' + plan.invalid + "</div>";
+      $("stats").innerHTML = ""; $("result").innerHTML = "";
+      $("capI").textContent = "· " + cfg.I + " B"; $("capW").textContent = "· " + cfg.W + " B";
+      $("prev").disabled = true; $("next").disabled = true;
+      return;
+    }
+    var st = replay(cfg, plan, idx), e = plan.ev[idx], cur = st.cur;
+    $("capI").textContent = "· " + cfg.I + " B = 엔트리 " + s.inEnt + "개 (행 묶음 " + s.rbPer + "개분)";
+    $("capW").textContent = "· " + cfg.W + " B = 엔트리 " + s.wEnt + "개 (출력 단위 " + s.ojPer + "개분)";
+    var inNow = {}, wNow = {};
+    st.inp.forEach(function (o) { inNow[o.b + "," + o.k] = true; });
+    st.wgt.forEach(function (o) { wNow[o.j + "," + o.k] = true; });
+
+    // DRAM x
+    var dx = $("dramX"); dx.innerHTML = "";
+    for (var b = 0; b < s.NB; b++) {
+      var r = el("div", "srow"); r.appendChild(el("span", "sl", "b=" + b + (cfg.BT > 1 ? "<br>" + rowsOf(b) : "")));
+      for (var k = 0; k < NK; k++) {
+        var key = b + "," + k, c = inNow[key] ? "tile" : st.inEver[key] ? "loaded" : "";
+        if (cur && cur.b === b && cur.k === k) c += " cur";
+        var cnt = st.inCnt[key] || 0; if (cnt > 1) c += " reload";
+        r.appendChild(block(nX(b, k), b * NK + k, cnt > 1 ? "×" + cnt : "", Xe(cfg, b, k), cfg.BT, BI, c));
+      }
+      dx.appendChild(r);
+    }
+    // DRAM W
+    var dw = $("dramW"); dw.innerHTML = ""; dw.style.gridTemplateColumns = "30px repeat(" + NK + ", max-content)";
+    dw.appendChild(el("div", "ax", ""));
+    for (k = 0; k < NK; k++) dw.appendChild(el("div", "ax", "k=" + k));
+    for (var j = 0; j < s.NJ; j++) {
+      dw.appendChild(el("div", "ax", "j=" + j));
+      for (k = 0; k < NK; k++) {
+        var wk = j + "," + k, wc = wNow[wk] ? "tile" : st.wEver[wk] ? "loaded" : "";
+        if (cur && cur.j === j && cur.k === k) wc += " cur";
+        var wn = st.wCnt[wk] || 0; if (wn > 1) wc += " reload";
+        dw.appendChild(block(nW(j, k), j * NK + k, wn > 1 ? "×" + wn : "", We(cfg, j, k), cfg.BO, BI, wc));
+      }
+    }
+    // DRAM y
+    var dy = $("dramY"); dy.innerHTML = "";
+    for (b = 0; b < s.NB; b++) {
+      var yr = el("div", "srow"); yr.appendChild(el("span", "sl", "b=" + b));
+      for (j = 0; j < s.NJ; j++) { var yv = st.y[b + "," + j]; yr.appendChild(block(nC(b, j), b * s.NJ + j, "", yv || null, cfg.BT, cfg.BO, yv ? "done" : "empty")); }
+      dy.appendChild(yr);
+    }
+    // inp_
+    var bi = $("bufInp"); bi.innerHTML = "";
+    for (var q = 0; q < s.inEnt; q++) {
+      var o = st.inp[q], ic = o ? "tile" : "empty";
+      if (o && cur && cur.b === o.b && cur.k === o.k) ic += " cur";
+      bi.appendChild(block(o ? "[" + q + "] " + nX(o.b, o.k) : "[" + q + "]", null, "", o ? Xe(cfg, o.b, o.k) : null, cfg.BT, BI, ic));
+    }
+    // wgt_
+    var bw = $("bufWgt"); bw.innerHTML = "";
+    for (q = 0; q < s.wEnt; q++) {
+      var w = st.wgt[q], c2 = w ? "tile" : "empty";
+      if (w && cur && cur.j === w.j && cur.k === w.k) c2 += " cur";
+      bw.appendChild(block(w ? "[" + q + "] " + nW(w.j, w.k) : "[" + q + "]", null, "", w ? We(cfg, w.j, w.k) : null, cfg.BO, BI, c2));
+    }
+    // acc_
+    var ba = $("bufAcc"); ba.innerHTML = "";
+    if (!st.accList.length) ba.appendChild(el("span", "hint", "비어 있음"));
+    st.accList.forEach(function (pp) {
+      var ak = pp[0] + "," + pp[1], ac = st.y[ak] ? "done" : "tile";
+      if (cur && cur.b === pp[0] && cur.j === pp[1]) ac += " cur";
+      ba.appendChild(block(nC(pp[0], pp[1]), null, "", st.acc[ak], cfg.BT, cfg.BO, ac));
+    });
+
+    // GEMM 코어: C 이전 + X · W(j,k)ᵀ = C 이후
+    var eq = $("coreEq"), dots = $("coreDots"); eq.innerHTML = ""; dots.innerHTML = "";
+    if (cur) {
+      var xe = Xe(cfg, cur.b, cur.k), we = We(cfg, cur.j, cur.k), ck = cur.b + "," + cur.j;
+      eq.appendChild(block(nC(cur.b, cur.j) + " 이전", null, "", st.before, cfg.BT, cfg.BO, "tile"));
+      eq.appendChild(el("span", "op", "+"));
+      eq.appendChild(block(nX(cur.b, cur.k), null, "", xe, cfg.BT, BI, "cur"));
+      eq.appendChild(el("span", "op", "·"));
+      eq.appendChild(block(nW(cur.j, cur.k) + " 엔트리 그대로 → ᵀ", null, "", we, cfg.BO, BI, "cur"));
+      eq.appendChild(el("span", "op", "="));
+      eq.appendChild(block(nC(cur.b, cur.j) + " 이후", null, "", st.acc[ck], cfg.BT, cfg.BO, "tile cur"));
+      var lines = ['<span class="mut">// wgt 엔트리의 행 o = 출력 하나의 가중치 ' + BI + "개, x 행과 내적 · 곱셈기 " + s.mults + "개가 한 사이클에 동시에</span>"];
+      for (var rr = 0; rr < cfg.BT; rr++) for (var oo = 0; oo < cfg.BO; oo++) {
+        var terms = we[oo].map(function (wv, i) { return sg(xe[rr][i]) + "×" + sg(wv); }).join(" + ");
+        lines.push('<span class="mut">y[' + (cur.b * cfg.BT + rr) + "][" + (cur.j * cfg.BO + oo) + "]</span>  " + st.before[rr][oo] + " + (" + terms + ") = " +
+          st.before[rr][oo] + ' + <span class="hl">' + st.part[rr][oo] + "</span> = <b>" + st.acc[ck][rr][oo] + "</b>");
+      }
+      dots.innerHTML = lines.join("<br>"); dots.style.display = "";
+    } else {
+      eq.appendChild(el("span", "hint", "GEMM 스텝에서 블록 곱이 여기에 표시된다."));
+      dots.style.display = "none";
+    }
+
+    // 설명
+    var order = cfg.O === "is" ? "입력 고정" : "가중치 고정";
+    if (e.t === "start") {
+      ex.innerHTML = "<b>" + order + "</b> 순서. 입력 버퍼에는 행 묶음 " + s.rbPer + "개분, 가중치 버퍼에는 출력 단위 " + s.ojPer + "개분이 들어간다. 입력 타일 " +
+        plan.inTiles + "개 × 가중치 타일 " + plan.wTiles + "개를 " + (cfg.O === "is" ? "입력 타일 바깥" : "가중치 타일 바깥") + " 순서로 돈다. GEMM 스텝마다 곱셈기 " + s.mults + "개가 동시에 일한다.";
+    } else if (e.t === "loadInp") {
+      var again = e.bs.some(function (b2) { return (st.inCnt[b2 + ",0"] || 0) > 1; });
+      ex.innerHTML = e.bs.map(function (b2) { return rowsOf(b2); }).join(", ") + "의 입력 엔트리를 inp_에 올린다." + (again ? " <b>이미 읽었던 입력을 다시 읽는다.</b> 가중치 타일을 바꾸는 동안 버퍼에서 밀려났기 때문이다." : "");
+    } else if (e.t === "loadWgt") {
+      var againW = e.js.some(function (j2) { return (st.wCnt[j2 + ",0"] || 0) > 1; });
+      ex.innerHTML = "가중치 타일 " + e.tile + "을 wgt_에 올린다." + (againW ? " <b>이미 읽었던 가중치를 다시 읽는다.</b> 다음 행 묶음으로 넘어가면서 같은 가중치가 다시 필요해졌기 때문이다." : "");
+    } else if (e.t === "reset") {
+      ex.innerHTML = "이번에 계산할 누산기 " + e.pairs.length + "개를 <b>0으로 초기화</b>한다. 이 누산기들은 k를 다 돌 때까지 칩 안에 머문다 (출력 고정).";
+    } else if (e.t === "gemm") {
+      ex.innerHTML = "<b>GEMM</b>: " + nX(cur.b, cur.k) + "와 " + nW(cur.j, cur.k) + "ᵀ를 곱해 " + nC(cur.b, cur.j) + "에 <b>누적</b>한다." +
+        (cfg.BT > 1 ? " wgt_ 엔트리 하나를 읽어 " + cfg.BT + "행이 동시에 쓴다." : "") + (cur.k === NK - 1 ? " 출력 단위 완성." : "");
+    } else if (e.t === "store") {
+      ex.innerHTML = "완성된 " + e.pairs.length + "개 엔트리를 int8로 잘라 DRAM의 y로 보낸다 (TruncStore).";
+    } else {
+      ex.innerHTML = "끝. <b>" + order + "</b>의 DRAM 트래픽은 " + (st.inpB + st.wgtB + st.outB) + " B다. 루프 순서나 BATCH를 바꿔 다시 돌려 보자. 빨간 점선(×n)이 다시 읽은 엔트리다.";
+    }
+
+    $("stats").innerHTML =
+      stat("GEMM 스텝", st.gemm + "/" + (s.NB * s.NJ * NK)) +
+      stat("곱셈기", s.mults + "개", "hw") +
+      stat("wgt_ 읽기", st.gemm + "회", "hw") +
+      stat("입력 load", st.inpB + " B") + stat("가중치 load", st.wgtB + " B") + stat("출력 store", st.outB + " B") +
+      stat("DRAM 합계", (st.inpB + st.wgtB + st.outB) + " B", "total");
+
+    var res = $("result");
+    if (e.t === "done") {
+      var out = [], allOk = true;
+      for (var row = 0; row < cfg.B; row++) {
+        var bb = Math.floor(row / cfg.BT), ri = row % cfg.BT, got = [];
+        for (j = 0; j < s.NJ; j++) got = got.concat(st.y[bb + "," + j][ri]);
+        var ok = JSON.stringify(got) === JSON.stringify(refRow(row)); allOk = allOk && ok;
+        out.push("행 " + row + " " + fmt(got) + (ok ? "" : "  ≠ " + fmt(refRow(row))));
+      }
+      res.innerHTML = out.join("<br>") + "<br>" + (allOk ? '<span class="ok">x · W와 모두 일치</span>' : '<span style="color:#B42318;font-weight:700">불일치</span>');
+    } else res.innerHTML = "";
+
+    var list = $("insns").children;
+    for (var n = 0; n < list.length; n++) list[n].className = "insn" + (n < idx ? " past" : n === idx ? " now" : "");
+    var now = list[idx];
+    if (now) { var box = $("insns"), top = now.offsetTop - box.offsetTop; if (top < box.scrollTop || top > box.scrollTop + box.clientHeight - 24) box.scrollTop = top - 60; }
+    $("prev").disabled = idx === 0; $("next").disabled = idx === plan.ev.length - 1;
+  }
+  function stat(k, n, cls) { return '<div class="stat ' + (cls || "") + '"><div class="k">' + k + '</div><div class="n">' + n + "</div></div>"; }
+
+  function step(d) { idx = Math.max(0, Math.min(plan.ev.length - 1, idx + d)); render(); }
+  function stop() { if (timer) { clearInterval(timer); timer = null; } var p = $("play"); if (p) p.textContent = "▶ 재생"; }
+  function play() {
+    if (plan.invalid) return;
+    if (timer) { stop(); return; }
+    if (idx >= plan.ev.length - 1) idx = 0;
+    $("play").textContent = "⏸ 정지";
+    timer = setInterval(function () { if (idx >= plan.ev.length - 1) { stop(); return; } step(1); }, +$("speed").value);
+  }
+
+  $("next").addEventListener("click", function () { stop(); step(1); });
+  $("prev").addEventListener("click", function () { stop(); step(-1); });
+  $("first").addEventListener("click", function () { stop(); idx = 0; render(); });
+  $("end").addEventListener("click", function () { stop(); idx = plan.ev.length - 1; render(); });
+  $("play").addEventListener("click", play);
+  $("speed").addEventListener("input", function () { if (timer) { stop(); play(); } });
+  $("preset").addEventListener("change", function () { applyPreset($("preset").value); reset(); });
+  ["cfgB", "cfgBO", "cfgBT", "cfgI", "cfgW", "cfgO"].forEach(function (id) { $(id).addEventListener("change", function () { syncPreset(); reset(); syncPreset(); }); });
+  document.addEventListener("keydown", function (ev) {
+    if (ev.target.tagName === "SELECT" || ev.target.tagName === "INPUT") return;
+    if (ev.key === "ArrowRight") { stop(); step(1); ev.preventDefault(); }
+    else if (ev.key === "ArrowLeft") { stop(); step(-1); ev.preventDefault(); }
+    else if (ev.key === "Home") { stop(); idx = 0; render(); }
+    else if (ev.key === "End") { stop(); idx = plan.ev.length - 1; render(); }
+    else if (ev.key === " ") { play(); ev.preventDefault(); }
+  });
+
+  // 링크로 예제 지정: 파일명#p7 → 예제 ⑦ (수학 시뮬레이터와 같은 번호)
+  var m = /^#p(\d)$/.exec(location.hash || "");
+  var start = m && PRESETS[String(+m[1] - 1)] ? String(+m[1] - 1) : "6";
+  $("preset").value = start; applyPreset(start);
+  reset();
+})();
+</script>
+</body>
+</html>
