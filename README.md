@@ -197,7 +197,7 @@ MAC 연산기가 하나라면 순차적으로 계산하고, MAC 연산기가 수
 
 ## 3.1 GPU (Graphics Processing Unit)
 
-![](005.jpg)
+![](006.jpg)
 
 - 대규모 병렬 연산
 - CUDA Core 및 Tensor Core
@@ -206,7 +206,7 @@ MAC 연산기가 하나라면 순차적으로 계산하고, MAC 연산기가 수
 
 ## 3.2 NPU (Neural Processing Unit)
 
-![](006.jpg)
+![](007.jpg)
 
 - 신경망 연산에 특화
 - MAC 어레이 및 행렬 연산기
@@ -292,6 +292,8 @@ MAC 연산기가 하나라면 순차적으로 계산하고, MAC 연산기가 수
 
 ## 5.1 A. 행렬 연산기 설계
 
+![](008.jpg)
+
 ![Systolic Array 구조](images/03_systolic.svg)
 
 현재 블록 행렬 곱셈을 실제 하드웨어로 구현하는 단계입니다.
@@ -309,6 +311,8 @@ MAC 연산기가 하나라면 순차적으로 계산하고, MAC 연산기가 수
 
 ## 5.2 B. 메모리 최적화
 
+![](009.jpg)
+
 ![Double Buffering 구조](images/05_double_buffer.svg)
 
 현재 시뮬레이터는 LOAD → GEMM → STORE를 순차적으로 수행합니다. 이를 다음과 같이 확장할 수 있습니다.
@@ -325,6 +329,8 @@ MAC 연산기가 하나라면 순차적으로 계산하고, MAC 연산기가 수
 단, 실제 성능 개선 정도는 데이터 전송 시간과 연산 시간, 버퍼 용량에 따라 달라집니다.
 
 ## 5.3 C. 정밀도와 양자화
+
+![](010.jpg)
 
 ![정밀도와 양자화](images/06_quantization.svg)
 
@@ -355,12 +361,16 @@ AI 반도체에서는 같은 행렬 연산이라도 데이터 표현 방식에 �
 
 ### CNN
 
+![](011.jpg)
+
 - Convolution
 - im2col
 - Feature Map
 - Matrix Multiplication
 
 ### Transformer
+
+![](012.jpg)
 
 - Q, K, V
 - Attention
@@ -371,9 +381,9 @@ CNN과 Transformer 모두 내부적으로 많은 행렬 연산을 수행합니�
 
 예를 들어 Transformer의 Attention은 다음과 같습니다.
 
-\[
+$$
 Attention(Q,K,V)=Softmax\left(\frac{QK^T}{\sqrt{d_k}}\right)V
-\]
+$$
 
 현재의 GEMM 시뮬레이터를 확장하면 QKᵀ 연산과 Attention 결과 계산까지 추적할 수 있습니다.
 
@@ -385,6 +395,8 @@ Attention(Q,K,V)=Softmax\left(\frac{QK^T}{\sqrt{d_k}}\right)V
 
 ## Project 1. Python GEMM Simulator
 
+![](013.jpg)
+
 **가장 먼저 추천하는 프로젝트**
 
 - Python / NumPy
@@ -394,12 +406,16 @@ Attention(Q,K,V)=Softmax\left(\frac{QK^T}{\sqrt{d_k}}\right)V
 
 ## Project 2. GPU Tensor Core
 
+![](014.jpg)
+
 - CUDA
 - cuBLAS
 - FP16 / TF32 / INT8
 - GPU 성능 비교
 
 ## Project 3. Verilog Systolic Array
+
+![](015.jpg)
 
 - 4×4 MAC Array
 - PE 설계
@@ -408,12 +424,16 @@ Attention(Q,K,V)=Softmax\left(\frac{QK^T}{\sqrt{d_k}}\right)V
 
 ## Project 4. FPGA AI Accelerator
 
+![](016.jpg)
+
 - AXI DMA
 - AXI BRAM Controller
 - GEMM IP
 - PS-PL 데이터 전송
 
 ## Project 5. ASIC Accelerator
+
+![](017.jpg)
 
 - RTL Synthesis
 - Timing Analysis
@@ -457,6 +477,8 @@ Attention(Q,K,V)=Softmax\left(\frac{QK^T}{\sqrt{d_k}}\right)V
 | 계산 구조 | 실행 구조 |
 
 이 두 가지를 합치면 AI 가속기의 전체 구조를 이해할 수 있습니다.
+
+![](018.jpg)
 
 ![AI Accelerator 전체 구조](images/08_full_accelerator.svg)
 
