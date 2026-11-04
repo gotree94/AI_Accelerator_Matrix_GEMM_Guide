@@ -99,6 +99,8 @@ $$
 
 실행 흐름은 다음과 같습니다.
 
+![](003.jpg)
+
 1. DRAM에 저장된 입력 X와 가중치 W를 준비합니다.
 2. DMA LOAD로 필요한 데이터 블록을 온칩으로 가져옵니다.
 3. SRAM의 `inp_`, `wgt_` 버퍼에 데이터를 배치합니다.
@@ -154,6 +156,8 @@ MAC 연산기가 하나라면 순차적으로 계산하고, MAC 연산기가 수
 
 동시에 몇 개의 연산을 수행할 수 있는가에 관한 것입니다.
 
+![](004.jpg)
+
 ![Systolic Array의 PE 구조](images/03_systolic.svg)
 
 대표적인 구조는 다음과 같습니다.
@@ -167,6 +171,8 @@ MAC 연산기가 하나라면 순차적으로 계산하고, MAC 연산기가 수
 첫 번째 시뮬레이터에서 BATCH를 증가시키는 과정은 이러한 병렬 연산 구조를 이해하는 기초가 됩니다.
 
 ## 2.3 메모리 계층(Memory Hierarchy)
+
+![](005.jpg)
 
 ![GPU 및 AI 가속기 메모리 계층](images/04_memory_hierarchy.svg)
 
@@ -191,12 +197,16 @@ MAC 연산기가 하나라면 순차적으로 계산하고, MAC 연산기가 수
 
 ## 3.1 GPU (Graphics Processing Unit)
 
+![](005.jpg)
+
 - 대규모 병렬 연산
 - CUDA Core 및 Tensor Core
 - 다양한 연산을 유연하게 수행
 - AI, 그래픽, 과학 계산 등에 활용
 
 ## 3.2 NPU (Neural Processing Unit)
+
+![](006.jpg)
 
 - 신경망 연산에 특화
 - MAC 어레이 및 행렬 연산기
