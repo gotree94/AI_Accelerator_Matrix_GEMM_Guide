@@ -17,7 +17,7 @@
 
 ![블록 행렬 곱셈과 타일링](images/01_block_tiling.svg)
 
-![](001.jpeg)
+![](0001.jpg)
 
 **핵심: 연산 구조 이해**
 
@@ -81,7 +81,7 @@ Y=X\times W
 
 ![VTA 스타일 GEMM 데이터 흐름](images/02_vta_dataflow.svg)
 
-![](002.jpeg)
+![](002.jpg)
 
 **핵심: 하드웨어 동작과 데이터 이동 이해**
 
